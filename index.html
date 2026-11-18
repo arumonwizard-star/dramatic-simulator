@@ -95,6 +95,8 @@ body.pres #present,body.pres #pexit{display:block}
 #pngImg{max-width:100%;border-radius:8px;border:1px solid var(--ln)}
 .ver{color:var(--mu);font-size:10px}
 .mobileOnly{display:none}
+#camSel{display:none;width:auto;font-size:14px;padding:5px 8px;background:#232734e6}
+.brk{display:none}
 @media (pointer:coarse){
  input[type=text],textarea,select{font-size:16px}
  button{min-height:36px}
@@ -103,12 +105,27 @@ body.pres #present,body.pres #pexit{display:block}
  #cam3d button{min-height:34px}
 }
 @media (max-width:900px){
+ #app{grid-template-rows:auto 1fr auto}
+ header{flex-wrap:wrap;overflow:visible;row-gap:6px;padding:6px 8px;height:auto}
+ header button{padding:6px 8px;font-size:13px;min-height:34px}
+ header .seg button{padding:6px 9px}
+ #stat i{width:7px;height:7px}
+ header .nm{order:1}#bLeft{order:2}#bRight{order:3}header .sp{order:4}#bUndo{order:5}#bRedo{order:6}#bPresent{order:7}
+ .brk{display:block;flex-basis:100%;height:0;order:8}
+ header .seg:not(.hideM){order:9}#bTheater{order:10}#tMulti{order:11}#bMenu{order:12}#stat{order:13}
+ header .nm img{width:28px;height:28px}
+ #cam3d{gap:6px;top:8px;left:8px}
+ #cam3d button[data-cam]{display:none}#camSel{display:block}
+ #tools{top:8px;right:8px}#zIn,#zOut{display:none}
+ footer{padding:6px 8px;padding-bottom:calc(6px + env(safe-area-inset-bottom));gap:6px}
+ .fbtn button{padding:5px 8px;font-size:13px;min-height:32px}
+ .th{width:104px}.th canvas{width:96px;height:50px}
  #cal{grid-template-columns:1fr;grid-template-rows:52% 48%}
  #calSide{border-left:none;border-top:1px solid var(--ln)}
  #hud{display:none}
  #pexit{top:calc(10px + env(safe-area-inset-top))}
  #app{grid-template-columns:0 1fr 0}
- aside{position:fixed;top:calc(46px + env(safe-area-inset-top));bottom:calc(104px + env(safe-area-inset-bottom));width:270px;z-index:20;display:none;box-shadow:0 0 30px #000}
+ aside{position:fixed;top:calc(var(--hh,96px) + env(safe-area-inset-top));bottom:var(--fh,90px);width:270px;z-index:20;display:none;box-shadow:0 0 30px #000}
  #left{left:0}#right{right:0}
  aside.open{display:block}
  .mobileOnly{display:inline-block}
@@ -119,7 +136,7 @@ body.pres #present,body.pres #pexit{display:block}
 </head>
 <body>
 <div id="app">
-<header>
+<header id="hdr">
  <div class="nm"><img src="apple-touch-icon.png" alt=""><span>ドラマチックシミュレーター</span></div>
  <button class="mobileOnly" id="bLeft">出るもの</button>
  <button id="bTheater" title="劇場の大きさ・図面">劇場</button>
@@ -132,6 +149,7 @@ body.pres #present,body.pres #pexit{display:block}
  <button id="bMenu">ファイル</button>
  <button class="mobileOnly" id="bRight">詳細</button>
  <button class="pri" id="bPresent">▶ 発表</button>
+ <div class="brk"></div>
 </header>
 <aside id="left">
  <h3>出るもの（このシーン）</h3>
@@ -143,7 +161,7 @@ body.pres #present,body.pres #pexit{display:block}
 </aside>
 <div id="stage">
  <canvas id="gl"></canvas><canvas id="cv"></canvas>
- <div id="cam3d"><button data-cam="aud">客席から</button><button data-cam="bal">2階席</button><button data-cam="diag">ななめ</button><button data-cam="top">真上</button><button data-cam="sl">下手袖</button><button data-cam="sr">上手袖</button><button data-cam="back">奥から</button><button id="bSpot" class="on">ピンスポ</button></div>
+ <div id="cam3d"><button data-cam="aud">客席から</button><button data-cam="bal">2階席</button><button data-cam="diag">ななめ</button><button data-cam="top">真上</button><button data-cam="sl">下手袖</button><button data-cam="sr">上手袖</button><button data-cam="back">奥から</button><button id="bSpot" class="on">ピンスポ</button><select id="camSel"><option value="">視点を選ぶ…</option><option value="aud">客席から</option><option value="bal">2階席</option><option value="diag">ななめ</option><option value="top">真上</option><option value="sl">下手袖</option><option value="sr">上手袖</option><option value="back">奥から</option></select></div>
  <div id="tools"><button id="zIn" title="拡大">＋</button><button id="zOut" title="縮小">－</button><button id="zFit" title="全体を表示">⤢</button></div>
  <div id="hud"></div>
  <div id="present"><div class="tt"></div><div class="nt"></div><div class="pg"></div></div>
@@ -231,7 +249,7 @@ body.pres #present,body.pres #pexit{display:block}
 
 <script>
 'use strict';
-const VER='1.6.0';
+const VER='1.7.0';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -290,6 +308,17 @@ function posRef(id){return markOf(id)||scene().pos[id]}
 function fixDoc(d){d.marks=d.marks||[];const T=d.theater;if(!T.don)T.don={on:true,color:'#7a1622'};if(T.tsura===undefined)T.tsura=1;if(T.tsuraBack===undefined)T.tsuraBack=false;return d}
 let showMarks=true;
 let selSet=new Set(),multiMode=false;
+let guides={x:null,y:null,lx:'',ly:''};
+// 動かしている位置(x,y)を、近くの「そろえる先」に吸い付ける。tolはm。moving=動かしているidの集合
+function magnet(x,y,moving,tol,useY){
+ const cx=[[0,'センター']],cy=[[hesoMark().y,'ヘソ'],[0,'ツラ']];
+ for(const it of doc.items){if(moving.has(it.id))continue;const p=posOf(it.id);if(!p||p.a<.5)continue;cx.push([p.x,it.name]);cy.push([p.y,it.name])}
+ for(const m of (showMarks?doc.marks:[])){if(moving.has(m.id))continue;cx.push([m.x,'バミリ'+(m.label||'')]);cy.push([m.y,'バミリ'+(m.label||'')])}
+ let bx=null,by=null;for(const [v,n] of cx){const d=Math.abs(v-x);if(d<=tol&&(!bx||d<bx.d))bx={v,n,d}}
+ if(useY)for(const [v,n] of cy){const d=Math.abs(v-y);if(d<=tol&&(!by||d<by.d))by={v,n,d}}
+ guides={x:bx?bx.v:null,y:by?by.v:null,lx:bx?bx.n:'',ly:by?by.n:''};
+ return [bx?bx.v:x,by?by.v:y,!!bx,!!by]}
+function clearGuides(){guides={x:null,y:null,lx:'',ly:''}}
 function isMulti(){return selSet.size>1&&sel&&selSet.has(sel)}
 function selIds(){return isMulti()?[...selSet]:sel?[sel]:[]}
 function isS(id){return sel===id||(isMulti()&&selSet.has(id))}
@@ -452,6 +481,11 @@ function drawPlan(c,w,h,vw,sc,o){
  const sm=o.sel&&!isMulti()&&o.ui!==false&&showMarks&&markOf(o.sel);
  if(sm){const [a,bb]=P(sm.x,sm.y),[za]=P(0,sm.y),[,zb]=P(sm.x,0);c.setLineDash([3,3]);c.strokeStyle='#4ea1ff';c.lineWidth=1;c.beginPath();c.moveTo(a,bb);c.lineTo(za,bb);c.moveTo(a,bb);c.lineTo(a,zb);c.stroke();c.setLineDash([]);
   c.font='600 11px sans-serif';c.fillStyle='#4ea1ff';c.textAlign='center';c.textBaseline='bottom';tag(c,posLabel(sm.x),Math.abs(sm.x)<0.005?a:(a+za)/2,bb-14);c.textAlign='left';c.textBaseline='middle';tag(c,'ツラから '+f2(sm.y)+'m',a+6,(bb+zb)/2)}
+ // マグネットのガイド
+ if(o.ui!==false&&(guides.x!==null||guides.y!==null)){c.save();c.strokeStyle='#ff4fd8';c.fillStyle='#ff4fd8';c.lineWidth=1.5;c.setLineDash([6,4]);c.font='700 11px sans-serif';
+  if(guides.x!==null){const [a,b1]=P(guides.x,b.y1+0.5),[,b2]=P(guides.x,-2);c.beginPath();c.moveTo(a,b1);c.lineTo(a,b2);c.stroke();c.textAlign='left';c.textBaseline='top';c.fillText(guides.lx,a+4,b1+2)}
+  if(guides.y!==null){const [a1,bb1]=P(b.x0,guides.y),[a2]=P(b.x1,guides.y);c.beginPath();c.moveTo(a1,bb1);c.lineTo(a2,bb1);c.stroke();c.textAlign='left';c.textBaseline='bottom';c.fillText(guides.ly,a1+4,bb1-3)}
+  c.restore()}
  // 測定
  if(measure&&o.ui!==false){const [a,bb]=P(measure.a[0],measure.a[1]),[a2,bb2]=P(measure.b[0],measure.b[1]);c.strokeStyle='#3ecf8e';c.lineWidth=2;c.beginPath();c.moveTo(a,bb);c.lineTo(a2,bb2);c.stroke();
   for(const [q,r] of [[a,bb],[a2,bb2]]){c.beginPath();c.arc(q,r,4,0,7);c.fillStyle='#3ecf8e';c.fill()}
@@ -501,18 +535,18 @@ function allMarks(){return [hesoMark(),...(showMarks?(doc.marks||[]):[])]}
 function markArms(m){if(m.shape==='X'){const L=(m.size||30)/100;return [[0,0,L,0.05,45],[0,0,L,0.05,-45]]}const L=(m.size||30)/100,t=0.05,h=L/2;// [中心x,中心y,幅,奥行]（ローカル、y+=客席側）
  switch(m.shape){case 'T':return [[0,-h+t/2,L,t],[0,0,t,L]];case 'L':return [[-h+t/2,0,t,L],[0,h-t/2,L,t]];case 'line':return [[0,0,L,t]];case 'dot':return [[0,0,0.08,0.08]];default:return [[0,0,L,t],[0,0,t,L]]}}
 // バミリ：縮小しても最低の大きさで見えるようにする（実寸より小さくは描かない）
-function markPx(m,k){const L=(m.size||30)/100*k;return Math.max(L,m.fixed?20:16)}
-function drawMarkPlan(c,vw,m,isSel){const k=vw.k,[sx,sy]=pS(vw,m.x,m.y),Lp=markPx(m,k),f=Lp/((m.size||30)/100*k),tw=Math.max(2.5,0.05*k);
+function markPx(m,k){return Math.max(2,(m.size||30)/100*k)}
+function drawMarkPlan(c,vw,m,isSel){const k=vw.k,[sx,sy]=pS(vw,m.x,m.y),Lp=markPx(m,k),f=1,tw=Math.max(2,0.05*k);
  c.save();c.translate(sx,sy);c.rotate((m.r||0)*Math.PI/180);
  const arms=markArms(m),drawArms=(col,ex)=>{c.fillStyle=col;for(const [x,y,w,d,a] of arms){const W=(w<=0.051?tw:w*k*f)+ex,D=(d<=0.051?tw:d*k*f)+ex;c.save();c.translate(x*k*f,y*k*f);if(a)c.rotate(a*Math.PI/180);c.fillRect(-W/2,-D/2,W,D);c.restore()}};
- drawArms('rgba(0,0,0,.6)',2);drawArms(m.color,0);
- if(isSel){const r=Lp/2+6;c.strokeStyle='#4ea1ff';c.lineWidth=1.5;c.setLineDash([3,3]);c.beginPath();c.arc(0,0,r,0,7);c.stroke();c.setLineDash([])}
- c.restore();if(m.label)markLabel(c,m,sx+Lp/2+3,sy-3)}
+ if(Lp>10)drawArms('rgba(0,0,0,.6)',2);drawArms(m.color,0);
+ if(isSel){const r=Math.max(Lp/2,6)+6;c.strokeStyle='#4ea1ff';c.lineWidth=1.5;c.setLineDash([3,3]);c.beginPath();c.arc(0,0,r,0,7);c.stroke();c.setLineDash([])}
+ c.restore();if(m.label)markLabel(c,m,sx+Math.max(Lp/2,3)+3,sy-3)}
 // 名前ラベル。番号だけのバミリは四角で囲む
 function markLabel(c,m,x,y){c.save();c.font='700 11px sans-serif';const num=/^\d+$/.test(String(m.label).trim()),tw=c.measureText(m.label).width;
  if(num){const sz=Math.max(16,tw+8);c.fillStyle='rgba(14,16,22,.9)';c.fillRect(x,y-sz,sz,sz);c.strokeStyle=m.color;c.lineWidth=1.8;c.strokeRect(x+0.9,y-sz+0.9,sz-1.8,sz-1.8);c.fillStyle=m.color;c.textAlign='center';c.textBaseline='middle';c.fillText(m.label,x+sz/2,y-sz/2+0.5)}
  else{c.textAlign='left';c.textBaseline='bottom';c.fillStyle=m.color;c.shadowColor='#000';c.shadowBlur=3;c.fillText(m.label,x,y)}c.restore()}
-function hitMark(sx,sy){if(!showMarks||regionAt(sy)!=='plan')return null;let best=null,bd=1e9;for(const m of doc.marks||[]){const [x,y]=pS(V,m.x,m.y),d=Math.hypot(sx-x,sy-y),r=Math.max(markPx(m,V.k)/2+4,TOUCH?20:10);if(d<=r&&d<bd){bd=d;best=m}}return best}
+function hitMark(sx,sy){if(!showMarks||regionAt(sy)!=='plan')return null;let best=null,bd=1e9;for(const m of doc.marks||[]){const [x,y]=pS(V,m.x,m.y),d=Math.hypot(sx-x,sy-y),r=Math.max(markPx(m,V.k)/2+4,TOUCH?22:12);if(d<=r&&d<bd){bd=d;best=m}}return best}
 function hexA(h,a){const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}
 
 function drawFront(c,w,h,vw,sc,o){
@@ -558,6 +592,7 @@ function drawFront(c,w,h,vw,sc,o){
    if(it.shape==='ellipse'&&false){}rr(c,x0,y0,x1-x0,y1-y0,2);c.fillStyle=shade(it.color,dim);c.fill();c.lineWidth=oS(o,it.id)?2.5:1;c.strokeStyle=oS(o,it.id)?'#fff':'rgba(0,0,0,.6)';c.stroke();
    c.font='11px sans-serif';c.textAlign='center';c.textBaseline='bottom';c.fillStyle='#fff';c.shadowColor='#000';c.shadowBlur=3;c.fillText(it.name,(x0+x1)/2,y0-2);c.restore()}}
  if(!donDone)drawDon();
+ if(o.ui!==false&&guides.x!==null){const [gx,gy0]=F(guides.x,T.height+0.5),[,gy1]=F(guides.x,0);c.save();c.strokeStyle='#ff4fd8';c.lineWidth=1.5;c.setLineDash([6,4]);c.beginPath();c.moveTo(gx,gy0);c.lineTo(gx,gy1);c.stroke();c.restore()}
  // 選択中の高さ
  const s=o.sel&&!isMulti()&&its.find(e=>e.it.id===o.sel);
  if(s&&o.ui!==false){const z0=baseZ(s.it,s.p,sc),top=z0+s.it.h/100,[x,y]=F(s.p.x,top),[,y0]=F(s.p.x,0),pw=(s.it.type==='actor'?s.it.w:projW(s.it,s.p.r))/100,[xr]=F(s.p.x+pw/2+0.12,0);
@@ -637,14 +672,17 @@ cv.addEventListener('pointermove',e=>{
  if(drag.t==='pan'){V.ox=drag.ox+sx-drag.x;V.oy=drag.oy+sy-drag.y;draw();return}
  if(drag.t==='band'){drag.x1=sx;drag.y1=sy;draw();return}
  if(drag.t==='group'){let dx,dy=0;if(drag.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);dx=snapv(wx-drag.wx,e.altKey);dy=snapv(wy-drag.wy,e.altKey)}else dx=snapv((sx-V.ox)/V.k-drag.wx,e.altKey);
+  const ref=drag.st[sel];if(ref&&!e.altKey){const mv=new Set(Object.keys(drag.st)),[nx,ny,gx,gy]=magnet(ref.x+dx,ref.y+dy,mv,10/V.k,drag.reg==='plan');if(gx)dx=nx-ref.x;if(gy)dy=ny-ref.y}else clearGuides();
   for(const id in drag.st){const q=posRef(id);if(q){q.x=+(drag.st[id].x+dx).toFixed(3);q.y=+(drag.st[id].y+dy).toFixed(3)}}drag.moved=true;draw();return}
  if(drag.t==='meas'){measure.b=Sp(V,sx,sy);if(!e.altKey){measure.b=measure.b.map(v=>snapv(v))}draw();return}
  const p=posRef(sel);if(!p)return;
- if(drag.t==='item'){if(drag.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);p.x=snapv(wx+drag.dx,e.altKey);p.y=snapv(wy+drag.dy,e.altKey)}else{p.x=snapv((sx-V.ox)/V.k+drag.dx,e.altKey)}
+ if(drag.t==='item'){const tol=10/V.k,mv=new Set([sel]);
+  if(drag.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);let nx=wx+drag.dx,ny=wy+drag.dy,gx=false,gy=false;if(!e.altKey)[nx,ny,gx,gy]=magnet(nx,ny,mv,tol,true);else clearGuides();p.x=gx?nx:snapv(nx,e.altKey);p.y=gy?ny:snapv(ny,e.altKey)}
+  else{let nx=(sx-V.ox)/V.k+drag.dx,gx=false;if(!e.altKey)[nx,,gx]=magnet(nx,p.y,mv,tol,false);else clearGuides();p.x=gx?nx:snapv(nx,e.altKey)}
   p.x=+p.x.toFixed(3);p.y=+p.y.toFixed(3);drag.moved=true;draw();liveProps()}
  if(drag.t==='rot'){const [cx,cy]=pS(V,p.x,p.y);let a=Math.atan2(-(sx-cx),sy-cy)*180/Math.PI;if(!e.altKey)a=Math.round(a/15)*15;p.r=Math.round(((a%360)+540)%360-180);drag.moved=true;draw();liveProps()}
 });
-function endPtr(e){ptrs.delete(e.pointerId);if(mode==='3d'){up3();return}if(!drag)return;if(drag.t==='pinch'){if(ptrs.size<2)drag=null;return}
+function endPtr(e){ptrs.delete(e.pointerId);if(guides.x!==null||guides.y!==null){clearGuides();setTimeout(draw,0)}if(mode==='3d'){up3();return}if(!drag)return;if(drag.t==='pinch'){if(ptrs.size<2)drag=null;return}
  if((drag.t==='item'||drag.t==='rot')&&drag.moved){pushUndo(drag.s0);renderThumb(doc.cur);if(markOf(sel))renderList();save()}
  if(drag.t==='group'&&drag.moved){pushUndo(drag.s0);renderThumb(doc.cur);renderList();save()}
  if(drag.t==='band')finishBand(drag);
@@ -1147,6 +1185,13 @@ function wavyMesh(w,h,lam,amp){const key=w.toFixed(2)+'|'+h.toFixed(2)+'|'+lam.t
  for(let i=0;i<n;i++){const a=i*2;I.push(a,a+1,a+3,a,a+3,a+2)}
  m=mkMesh(P,N,null,I);WAVY.set(key,m);return m}
 function drapeWave(it,w2){const full=it.split?it.w/200:it.w/100,g=clamp(w2/full,0.12,1);return {lam:Math.max(0.07,0.34*g),amp:(it.sheer?0.045:0.075)*(g<1?1.25:1)}}
+const LTEX=new Map();
+function labelTex(text,color){const key=text+'|'+color;if(LTEX.has(key))return LTEX.get(key);const num=/^\d+$/.test(String(text).trim()),c=document.createElement('canvas'),g=c.getContext('2d');g.font='700 44px sans-serif';const tw=g.measureText(text).width;
+ c.height=64;c.width=num?Math.max(64,Math.ceil(tw+20)):Math.ceil(tw+12);g.font='700 44px sans-serif';g.textAlign='center';g.textBaseline='middle';
+ if(num){g.fillStyle='rgba(14,16,22,.92)';g.fillRect(0,0,c.width,c.height);g.strokeStyle=color;g.lineWidth=6;g.strokeRect(3,3,c.width-6,c.height-6)}
+ g.fillStyle=color;g.fillText(text,c.width/2,c.height/2+2);
+ const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+ const o={tex:t,ar:c.width/c.height};LTEX.set(key,o);return o}
 function rgb(h){const n=parseInt(h.slice(1),16);return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255]}
 function dm(mesh,M,col,o){o=o||{};const a=G3.a;
  gl.bindBuffer(gl.ARRAY_BUFFER,mesh.p);gl.enableVertexAttribArray(a.p);gl.vertexAttribPointer(a.p,3,gl.FLOAT,false,0,0);
@@ -1219,7 +1264,7 @@ function draw3d(){
  if(glc.width!==W||glc.height!==H){glc.width=W;glc.height=H}
  if(cv.width!==Math.round(r.width*(window.devicePixelRatio||1))||cv.height!==Math.round(r.height*(window.devicePixelRatio||1))){cv.width=Math.round(r.width*(window.devicePixelRatio||1));cv.height=Math.round(r.height*(window.devicePixelRatio||1))}
  gl.viewport(0,0,W,H);gl.clearColor(.043,.047,.07,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
- const T=doc.theater,sh=T.stageH??0.9,eye=camEye(),VP=M4.mul(M4.persp(cam.fov,W/H,0.05,400),M4.look(eye,[cam.tx,cam.ty,cam.tz],[0,1,0]));G3.VP=VP;G3.eye=eye;
+ const T=doc.theater,sh=T.stageH??0.9,eye=camEye(),VP=M4.mul(M4.persp(cam.fov,W/H,0.2,300),M4.look(eye,[cam.tx,cam.ty,cam.tz],[0,1,0]));G3.VP=VP;G3.eye=eye;
  gl.uniformMatrix4fv(G3.u.VP,false,VP);gl.disable(gl.BLEND);gl.depthMask(true);
  const hw=T.width/2,b=stageBounds(),xl=b.x0,xr=b.x1;
  // 舞台（袖ふくむ）と前面
@@ -1244,9 +1289,16 @@ function draw3d(){
  // ツラ番号（目印の線）
  if(T.tsura){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);const st=T.tsura,max=Math.max(-b.x0,b.x1),zs=[[0,-1]];if(T.tsuraBack)zs.push([-T.depth,1]);
   for(const [zz,dir] of zs)for(let i=0;i*st<=max+1e-6;i++)for(const xx of i?[i*st,-i*st]:[0]){if(xx<b.x0||xx>b.x1)continue;dm(G3.m.box,BX(xx-0.012,0.002,zz,xx+0.012,0.004,zz+dir*0.15),i===0?'#ff4d4d':'#ffd27a',{lit:false})}gl.disable(gl.BLEND)}
+ // マグネットのガイド
+ if(guides.x!==null)line3([[guides.x,0.012,0.6],[guides.x,0.012,-b.y1-0.3]],'#ff4fd8',1);
+ if(guides.y!==null)line3([[b.x0,0.012,-guides.y],[b.x1,0.012,-guides.y]],'#ff4fd8',1);
  // バミリ
- for(const m of allMarks()){const B=chain(M4.t(m.x,0.002,-m.y),M4.ry(-(m.r||0)*Math.PI/180));for(const [x,y,w,d,a] of markArms(m))dm(G3.m.box,chain(B,M4.t(x,0,y),M4.ry(-(a||0)*Math.PI/180),M4.s(w,0.003,d)),m.color,{lit:false});
+ gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(-4,-16);
+ for(const m of allMarks()){const B=chain(M4.t(m.x,0.004,-m.y),M4.ry(-(m.r||0)*Math.PI/180));for(const [x,y,w,d,a] of markArms(m))dm(G3.m.quad,chain(B,M4.t(x,0,y),M4.ry(-(a||0)*Math.PI/180),M4.t(-w/2,0,-d/2),M4.s(w,1,d)),m.color,{lit:false});
+  if(m.label){const L=(m.size||30)/100,t=labelTex(m.label,m.color);if(t){gl.bindTexture(gl.TEXTURE_2D,t.tex);gl.uniform1i(G3.u.tex,0);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);const hgt=0.13,wd=hgt*t.ar;
+   dm(G3.m.quad,chain(B,M4.t(L/2+0.05,0.001,-hgt-0.02),M4.s(wd,1,hgt)),[1,1,1],{tex:true,lit:false});gl.disable(gl.BLEND)}}
   if(isS(m.id)){const r=(m.size||30)/200+0.08,pts=[];for(let i=0;i<=40;i++){const t=i/40*Math.PI*2;pts.push([m.x+Math.cos(t)*r,0.01,-m.y+Math.sin(t)*r])}line3(pts,'#4ea1ff',1,gl.LINE_STRIP)}}
+ gl.disable(gl.POLYGON_OFFSET_FILL);
  for(const s of [-1,1])dm(G3.m.box,BX(s>0?xr:xl-0.2,-sh,0.3,s>0?xr+0.2:xl,top+1.5,-(T.depth+0.45)),'#15171f');
  // 客席
  dm(G3.m.box,BX(xl-4,-sh-0.1,0,xr+4,-sh,18),'#1b1719');
@@ -1286,9 +1338,7 @@ function draw3d(){
  ctx.globalAlpha=1;
  if(T.tsura){const st=T.tsura,max=Math.max(-b.x0,b.x1),every=Math.max(1,Math.ceil(0.9/st)>1&&cam.dist>25?2:1),zs=[0];if(T.tsuraBack)zs.push(-T.depth);ctx.font='700 11px sans-serif';ctx.textBaseline='top';
   for(const zz of zs)for(let i=0;i*st<=max+1e-6;i+=every)for(const xx of i?[i*st,-i*st]:[0]){if(xx<b.x0||xx>b.x1)continue;const q=proj3([xx,0.01,zz+(zz===0?0.05:-0.05)],r.width,r.height);if(!q)continue;ctx.fillStyle=i===0?'#ff6b6b':'#ffd27a';ctx.fillText(i===0?'0':String(i),q[0],q[1]+2)}}
- {for(const m of allMarks()){const q=proj3([m.x,0.02,-m.y],r.width,r.height);if(!q)continue;const q2=proj3([m.x+(m.size||30)/200,0.02,-m.y],r.width,r.height),pl=q2?Math.hypot(q2[0]-q[0],q2[1]-q[1]):0;
-   if(pl<14){ctx.save();ctx.translate(q[0],q[1]);ctx.strokeStyle='rgba(0,0,0,.7)';ctx.lineWidth=4.5;const g=()=>{ctx.beginPath();if(m.shape==='X'){ctx.moveTo(-5,-4);ctx.lineTo(5,4);ctx.moveTo(5,-4);ctx.lineTo(-5,4)}else{ctx.moveTo(-6,0);ctx.lineTo(6,0);ctx.moveTo(0,-4);ctx.lineTo(0,4)}ctx.stroke()};g();ctx.strokeStyle=m.color;ctx.lineWidth=2.2;g();ctx.restore()}
-   if(m.label)markLabel(ctx,m,q[0]+Math.max(pl,7)+2,q[1]-3)}}
+
  ctx.shadowBlur=0;
  if(sel&&!isMulti()&&markOf(sel)){const m=markOf(sel),q=proj3([m.x,0.02,-m.y],r.width,r.height);if(q){ctx.font='600 11px sans-serif';ctx.fillStyle='#4ea1ff';ctx.textBaseline='top';tag(ctx,posLabel(m.x)+'／ツラから '+f2(m.y)+'m',q[0],q[1]+16)}}
  if(sel){const s=its.find(e=>e.it.id===sel);if(s){const q=proj3([s.p.x,0.02,-s.p.y],r.width,r.height);if(q){ctx.font='600 11px sans-serif';ctx.fillStyle='#4ea1ff';ctx.textBaseline='top';
@@ -1323,13 +1373,16 @@ function move3(e,sx,sy){
   const cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;panBy(cx-drag3.cx,cy-drag3.cy,drag3.c0);draw();return}
  if(drag3.t==='orbit'){cam.yaw=drag3.c0.yaw-(sx-drag3.x)*0.006;cam.pitch=clamp(drag3.c0.pitch+(sy-drag3.y)*0.005,-0.15,1.55);draw();return}
  if(drag3.t==='pan'){panBy(sx-drag3.x,sy-drag3.y,drag3.c0);draw();return}
- if(drag3.t==='group'){const q=hitPlane(ray3(sx,sy),drag3.y);if(!q||!drag3.q0)return;const dx=snapv(q[0]-drag3.q0[0],e.altKey),dy=snapv(-(q[2]-drag3.q0[2]),e.altKey);for(const id in drag3.st){const p=posRef(id);if(p){p.x=+(drag3.st[id].x+dx).toFixed(3);p.y=+(drag3.st[id].y+dy).toFixed(3)}}drag3.moved=true;draw();return}
- if(drag3.t==='item'){const q=hitPlane(ray3(sx,sy),drag3.y),p=posRef(sel);if(!q||!p)return;p.x=+snapv(q[0]+drag3.dx,e.altKey).toFixed(3);p.y=+snapv(-q[2]+drag3.dy,e.altKey).toFixed(3);drag3.moved=true;draw();liveProps()}}
+ if(drag3.t==='group'){const q=hitPlane(ray3(sx,sy),drag3.y);if(!q||!drag3.q0)return;let dx=snapv(q[0]-drag3.q0[0],e.altKey),dy=snapv(-(q[2]-drag3.q0[2]),e.altKey);
+  const ref=drag3.st[sel];if(ref&&!e.altKey){const [nx,ny,gx,gy]=magnet(ref.x+dx,ref.y+dy,new Set(Object.keys(drag3.st)),Math.max(0.08,cam.dist*0.012),true);if(gx)dx=nx-ref.x;if(gy)dy=ny-ref.y}else clearGuides();for(const id in drag3.st){const p=posRef(id);if(p){p.x=+(drag3.st[id].x+dx).toFixed(3);p.y=+(drag3.st[id].y+dy).toFixed(3)}}drag3.moved=true;draw();return}
+ if(drag3.t==='item'){const q=hitPlane(ray3(sx,sy),drag3.y),p=posRef(sel);if(!q||!p)return;let nx=q[0]+drag3.dx,ny=-q[2]+drag3.dy,gx=false,gy=false;if(!e.altKey)[nx,ny,gx,gy]=magnet(nx,ny,new Set([sel]),Math.max(0.08,cam.dist*0.012),true);else clearGuides();
+  p.x=+(gx?nx:snapv(nx,e.altKey)).toFixed(3);p.y=+(gy?ny:snapv(ny,e.altKey)).toFixed(3);drag3.moved=true;draw();liveProps()}}
 function panBy(dx,dy,c0){const r=cv.getBoundingClientRect(),e=camEye(c0),f=nrm(sub([c0.tx,c0.ty,c0.tz],e)),s=nrm(cross(f,[0,1,0])),u=cross(s,f),k=2*c0.dist*Math.tan(cam.fov/2)/r.height;
  cam.tx=c0.tx-(s[0]*dx-u[0]*dy)*k;cam.ty=clamp(c0.ty-(s[1]*dx-u[1]*dy)*k,-1,20);cam.tz=c0.tz-(s[2]*dx-u[2]*dy)*k}
-function up3(){if(!drag3)return;if(drag3.t==='pinch'){if(ptrs.size<2)drag3=null;return}if(drag3.t==='group'&&drag3.moved){pushUndo(drag3.s0);renderList();renderThumb(doc.cur);save()}if(drag3.t==='item'&&drag3.moved){pushUndo(drag3.s0);if(markOf(sel))renderList();renderThumb(doc.cur);save()}drag3=null}
+function up3(){if(guides.x!==null||guides.y!==null){clearGuides();setTimeout(draw,0)}if(!drag3)return;if(drag3.t==='pinch'){if(ptrs.size<2)drag3=null;return}if(drag3.t==='group'&&drag3.moved){pushUndo(drag3.s0);renderList();renderThumb(doc.cur);save()}if(drag3.t==='item'&&drag3.moved){pushUndo(drag3.s0);if(markOf(sel))renderList();renderThumb(doc.cur);save()}drag3=null}
 cv.addEventListener('contextmenu',e=>{if(mode==='3d')e.preventDefault()});
 $$('#cam3d [data-cam]').forEach(b=>b.onclick=()=>camPreset(b.dataset.cam));
+$('#camSel').onchange=e=>{const v=e.target.value;e.target.value='';e.target.blur();if(v)camPreset(v)};
 $('#bSpot').onclick=()=>{spots=!spots;$('#bSpot').classList.toggle('on',spots);draw()};
 
 /* ---------- 自動更新 ---------- */
@@ -1351,6 +1404,7 @@ $('#bMenu').addEventListener('click',()=>{});
 /* ---------- 全体 ---------- */
 function renderAll(){renderList();renderProps();renderThumbs();draw()}
 new ResizeObserver(()=>{draw()}).observe($('#stage'));
+new ResizeObserver(()=>{document.documentElement.style.setProperty('--hh',$('#hdr').offsetHeight+'px');document.documentElement.style.setProperty('--fh',$('footer').offsetHeight+'px')}).observe($('#hdr'));
 new ResizeObserver(()=>{if($('#cal').classList.contains('show'))calDraw()}).observe($('#calStage'));
 (async()=>{
  try{await DB.open();const s=await DB.get('doc');if(s){doc=fixDoc(JSON.parse(s));doc.cur=clamp(doc.cur||0,0,doc.scenes.length-1)}const u=await DB.get('ul');if(u){ulSrc=u;ulImg=await loadImg(u)}setStat(true,'保存済み')}
