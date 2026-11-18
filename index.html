@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>ドラマチックシミュレーター</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -15,7 +15,7 @@
 <style>
 :root{--bg:#14161c;--pn:#1b1e27;--pn2:#232734;--ln:#2e3342;--tx:#e6e8ee;--mu:#8a90a2;--ac:#4ea1ff;--ok:#3ecf8e;--ng:#ff5a5a;--wa:#ffd27a}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+html,body{margin:0;height:100%;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;background:var(--bg);color:var(--tx);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
 input,textarea,select{-webkit-user-select:text;user-select:text}
 button{font:inherit;color:var(--tx);background:var(--pn2);border:1px solid var(--ln);border-radius:7px;padding:5px 10px;cursor:pointer;white-space:nowrap}
 button:hover{border-color:#47506a}
@@ -30,13 +30,13 @@ input.scrub{touch-action:pan-y}input.scrub:not(:focus){cursor:ew-resize}input.sc
 label.scrubL{cursor:ew-resize;touch-action:pan-y;text-decoration:underline dotted #4a5066;text-underline-offset:3px}
 body.scrubbing,body.scrubbing *{cursor:ew-resize!important;-webkit-user-select:none!important;user-select:none!important}
 input[type=color]{width:34px;height:28px;border:1px solid var(--ln);border-radius:6px;background:none;padding:1px}
-#app{display:grid;grid-template-rows:46px 1fr 104px;grid-template-columns:230px 1fr 260px;height:100%;padding-top:env(safe-area-inset-top)}
+#app{display:grid;grid-template-rows:46px 1fr 104px;grid-template-columns:230px 1fr 260px;height:100%;height:100dvh;padding-top:env(safe-area-inset-top)}
 header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid var(--ln);background:var(--pn);overflow-x:auto}
 header .nm{white-space:nowrap;flex:none;font-weight:700;font-size:15px;margin-right:6px;display:flex;align-items:center;gap:7px}
 header .nm img{width:22px;height:22px;border-radius:5px}
 .seg{display:flex}.seg button{border-radius:0;margin-left:-1px}.seg button:first-child{border-radius:7px 0 0 7px}.seg button:last-child{border-radius:0 7px 7px 0}
 .sp{flex:1}
-#stat{display:flex;align-items:center;gap:5px;color:var(--mu);font-size:11px}
+#stat{white-space:nowrap;flex:none;display:flex;align-items:center;gap:5px;color:var(--mu);font-size:11px}
 #stat i{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
 #stat.ng i{background:var(--ng)}#stat.ng{color:var(--ng)}
 aside{background:var(--pn);overflow:auto;padding:10px}
@@ -95,13 +95,25 @@ body.pres #present,body.pres #pexit{display:block}
 #pngImg{max-width:100%;border-radius:8px;border:1px solid var(--ln)}
 .ver{color:var(--mu);font-size:10px}
 .mobileOnly{display:none}
+@media (pointer:coarse){
+ input[type=text],textarea,select{font-size:16px}
+ button{min-height:36px}
+ #tools button{width:44px;height:42px}
+ .it{padding:9px 8px}
+ #cam3d button{min-height:34px}
+}
 @media (max-width:900px){
+ #cal{grid-template-columns:1fr;grid-template-rows:52% 48%}
+ #calSide{border-left:none;border-top:1px solid var(--ln)}
+ #hud{display:none}
+ #pexit{top:calc(10px + env(safe-area-inset-top))}
  #app{grid-template-columns:0 1fr 0}
- aside{position:fixed;top:46px;bottom:104px;width:270px;z-index:20;display:none;box-shadow:0 0 30px #000}
+ aside{position:fixed;top:calc(46px + env(safe-area-inset-top));bottom:calc(104px + env(safe-area-inset-bottom));width:270px;z-index:20;display:none;box-shadow:0 0 30px #000}
  #left{left:0}#right{right:0}
  aside.open{display:block}
  .mobileOnly{display:inline-block}
- header .hideM,header .nm span{display:none}
+ header .hideM,header .nm span,#stat span{display:none}
+ header{gap:5px;padding:0 6px}
 }
 </style>
 </head>
@@ -123,7 +135,8 @@ body.pres #present,body.pres #pexit{display:block}
 <aside id="left">
  <h3>出るもの（このシーン）</h3>
  <div class="grp"><button id="addActor">＋ 役者</button><button id="addKuroko">＋ クロコ</button><button id="addMark">＋ バミリ</button>
- <select id="addObj" style="flex:1 1 100%;min-width:0"><option value="">＋ 舞台セット・小道具…</option></select></div>
+ <select id="addObj" style="flex:1 1 100%;min-width:0"><option value="">＋ 舞台セット・小道具…</option></select>
+ <select id="addHang" style="flex:1 1 100%;min-width:0"><option value="">＋ 吊りもの・幕…</option></select></div>
  <div id="list"></div>
  <p class="note">「出す／裏」はシーンごと。裏にしたものは図に出ません。</p>
 </aside>
@@ -153,6 +166,7 @@ body.pres #present,body.pres #pexit{display:block}
  <div class="row"><label>高さ</label><input type="text" inputmode="decimal" id="tH"><span class="u">m</span></div>
  <div class="row"><label>舞台の高さ</label><input type="text" inputmode="decimal" id="tSH"><span class="u">m</span></div>
  <div class="row"><label>袖の幅</label><input type="text" inputmode="decimal" id="tWing"><span class="u">m</span></div>
+ <div class="row"><label>緞帳</label><input type="checkbox" id="tDon"><span class="note" style="margin:0">緞帳がある劇場</span><input type="color" id="tDonC" style="margin-left:auto"></div>
  <div class="row"><label>ツラ番号</label><select id="tTsura"><option value="0">出さない</option><option value="0.5">50cmごと</option><option value="0.9">90cmごと</option><option value="0.909">3尺（90.9cm）ごと</option><option value="1">1mごと</option></select></div>
  <div class="row"><label>奥にも</label><input type="checkbox" id="tTsuraBack"><span class="note" style="margin:0">舞台奥にもヘソと番号を出す</span></div>
  <div class="row"><label>マス目</label><select id="tGrid"><option value="1">1m</option><option value="0.5">50cm</option><option value="0.909">3尺（90.9cm）</option><option value="1.818">1間（181.8cm）</option></select></div>
@@ -186,7 +200,7 @@ body.pres #present,body.pres #pexit{display:block}
 <div id="cal">
  <div id="calStage"><canvas id="calCv"></canvas><div id="calMsg" style="position:absolute;left:12px;top:12px;background:#000b;padding:6px 10px;border-radius:7px;pointer-events:none"></div></div>
  <div id="calSide">
-  <h2 style="margin:0 0 10px;font-size:16px">図面から読み取る</h2>
+  <h2 style="margin:0 0 6px;font-size:16px">図面から読み取る</h2><p class="note" style="margin:0 0 10px">図面を開くと、縮尺・寸法・舞台の位置を自動で探して反映します。見つからなかったところだけ下の手順で合わせてください。</p>
   <div class="step" id="s1"><div class="t">1. 図面を開く</div>
    <div class="grp"><button id="cOpen" class="pri">画像・PDFを選ぶ</button><input type="file" id="cFile" accept="image/*,application/pdf,.pdf" hidden></div>
    <div id="cPdf" style="display:none"><div class="row"><label>ページ</label><input type="text" inputmode="numeric" id="cPage" value="1"><span class="u" id="cPages"></span></div>
@@ -217,7 +231,7 @@ body.pres #present,body.pres #pexit{display:block}
 
 <script>
 'use strict';
-const VER='1.4.0';
+const VER='1.5.0';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -240,6 +254,18 @@ const PRESETS=[
  ['階段 3段',91,90,60,'#8d7a60',1],['椅子',45,45,85,'#b5835a',0],['テーブル',120,75,72,'#a0764f',0],
  ['ソファ',180,85,80,'#6f7fa8',0],['ベッド',200,100,50,'#7f8fb0',1],['パネル 3×9尺',91,8,273,'#77808f',0],['パネル 6×9尺',182,8,273,'#77808f',0],
  ['ドア枠',100,15,210,'#8f7c6a',0],['マイクスタンド',30,30,150,'#555c6a',0],['箱 45cm',45,45,45,'#a08a60',1],['自由な大きさ',100,100,100,'#888fa0',0]];
+// 吊りもの・幕：[名前, 種類, 色, 紗, 中割]  大きさは劇場に合わせて決める
+const HANGS=[['袖幕','leg','#16161b',0,0],['一文字幕','border','#16161b',0,0],['中割幕','traveler','#16161b',0,1],['紗幕','scrim','#d8dbe4',1,0],['ホリゾント幕','cyc','#cfd8e8',0,0],['大黒幕','black','#101014',0,0],['吊りパネル・看板','panel','#77808f',0,0]];
+function hangSize(kind){const T=doc.theater,W=T.width,H=T.height,D=T.depth;
+ switch(kind){case 'leg':return {w:150,h:Math.round(H*100+60),elev:0,x:-(W/2-0.2),y:+(D*0.3).toFixed(2)};
+  case 'border':return {w:Math.round((W+2)*100),h:150,elev:Math.round((H-1.2)*100),x:0,y:+(D*0.3).toFixed(2)};
+  case 'traveler':return {w:Math.round((W+1)*100),h:Math.round(H*100+60),elev:0,x:0,y:+(D*0.5).toFixed(2)};
+  case 'scrim':return {w:Math.round((W+1)*100),h:Math.round(H*100+60),elev:0,x:0,y:+(D*0.7).toFixed(2)};
+  case 'cyc':return {w:Math.round((W+2)*100),h:Math.round(H*100+100),elev:0,x:0,y:+(D-0.3).toFixed(2)};
+  case 'black':return {w:Math.round((W+2)*100),h:Math.round(H*100+60),elev:0,x:0,y:+(D-0.8).toFixed(2)};
+  default:return {w:300,h:150,elev:Math.round(Math.max(150,H*50)),x:0,y:+(D*0.5).toFixed(2)}}}
+// 中割の開き（0=閉,1=開）に合わせた見える部分 [ローカルx中心, 幅] (m)
+function drapePanels(it,open){const w=it.w/100;if(!it.split)return [[0,w]];const half=w/2,vis=half*(1-0.85*clamp(open||0,0,1));return [[-w/2+vis/2,vis],[w/2-vis/2,vis]]}
 const ACOL=['#e8735a','#5aa0e8','#e8c45a','#6fd08c','#c27ae8','#e87aa8','#5ad0d0','#f0a050'];
 
 function newDoc(){
@@ -247,7 +273,7 @@ function newDoc(){
  const b={id:uid(),type:'actor',name:'役者B',color:ACOL[1],h:158,w:42,d:26,elev:0};
  const p={id:uid(),type:'object',name:'平台',color:'#9a8466',w:182,d:91,h:40,elev:0,shape:'rect',stand:true};
  const c={id:uid(),type:'object',name:'椅子',color:'#b5835a',w:45,d:45,h:85,elev:0,shape:'rect',stand:false};
- return {v:1,marks:[],theater:{name:'劇場',width:10,depth:8,height:6,wing:3,grid:1,outline:null,ul:null,tsura:1,tsuraBack:false},
+ return {v:1,marks:[],theater:{name:'劇場',width:10,depth:8,height:6,wing:3,grid:1,outline:null,ul:null,tsura:1,tsuraBack:false,don:{on:true,color:'#7a1622'}},
   items:[a,b,p,c],
   scenes:[{id:uid(),title:'シーン1',note:'',dur:1.2,pos:{[a.id]:{x:-1.5,y:2,r:0,on:true},[b.id]:{x:1.2,y:2.5,r:-20,on:true},[p.id]:{x:0,y:5,r:0,on:true},[c.id]:{x:2.5,y:4,r:30,on:true}}}],
   cur:0};
@@ -261,7 +287,7 @@ const scene=()=>doc.scenes[doc.cur];
 const item=id=>doc.items.find(i=>i.id===id);
 const markOf=id=>(doc.marks||[]).find(m=>m.id===id);
 function posRef(id){return markOf(id)||scene().pos[id]}
-function fixDoc(d){d.marks=d.marks||[];const T=d.theater;if(T.tsura===undefined)T.tsura=1;if(T.tsuraBack===undefined)T.tsuraBack=false;return d}
+function fixDoc(d){d.marks=d.marks||[];const T=d.theater;if(!T.don)T.don={on:true,color:'#7a1622'};if(T.tsura===undefined)T.tsura=1;if(T.tsuraBack===undefined)T.tsuraBack=false;return d}
 let showMarks=true;
 const MCOL=['#ff4d4d','#ffd23f','#3ecf8e','#4ea1ff','#ff8ad8','#ffffff','#ff9a3c','#b07cff'];
 function tsuraNo(x){const st=doc.theater.tsura;if(!st)return null;return Math.round(Math.abs(x)/st*10)/10}
@@ -310,15 +336,16 @@ let anim=null;
 const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
 function posOf(id,sc){
  sc=sc||scene();const p=sc.pos[id];
- if(!anim||sc!==scene())return p&&p.on?{x:p.x,y:p.y,r:p.r,a:1}:null;
+ if(!anim||sc!==scene())return p&&p.on?{x:p.x,y:p.y,r:p.r,a:1,open:p.open||0}:null;
  const t=ease(clamp((performance.now()-anim.t0)/anim.dur,0,1));
  const a=anim.from[id],b=anim.to[id],ao=a&&a.on,bo=b&&b.on;
- if(ao&&bo){let dr=((b.r-a.r)%360+540)%360-180;return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,r:a.r+dr*t,a:1}}
- if(bo)return {x:b.x,y:b.y,r:b.r,a:t};if(ao)return {x:a.x,y:a.y,r:a.r,a:1-t};return null}
+ if(ao&&bo){let dr=((b.r-a.r)%360+540)%360-180;return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,r:a.r+dr*t,a:1,open:(a.open||0)+((b.open||0)-(a.open||0))*t}}
+ if(bo)return {x:b.x,y:b.y,r:b.r,a:t,open:b.open||0};if(ao)return {x:a.x,y:a.y,r:a.r,a:1-t,open:a.open||0};return null}
+function donAt(sc){sc=sc||scene();const d=sc.don||0;if(!anim||sc!==scene())return d;const t=ease(clamp((performance.now()-anim.t0)/anim.dur,0,1));return (anim.fromDon||0)+(d-(anim.fromDon||0))*t}
 function goScene(i,animate){
  i=clamp(i,0,doc.scenes.length-1);if(i===doc.cur&&!animate)return;
- const from=JSON.parse(JSON.stringify(scene().pos));doc.cur=i;
- if(animate){anim={from,to:scene().pos,t0:performance.now(),dur:Math.max(.05,(scene().dur||1.2))*1000};loop()}
+ const from=JSON.parse(JSON.stringify(scene().pos)),fromDon=scene().don||0;doc.cur=i;
+ if(animate){anim={from,fromDon,to:scene().pos,t0:performance.now(),dur:Math.max(.05,(scene().dur||1.2))*1000};loop()}
  renderAll();save()}
 let looping=false;
 function loop(){if(looping)return;looping=true;const f=()=>{draw();if(anim&&performance.now()-anim.t0>anim.dur)anim=null;if(!anim&&!camAnim){draw();looping=false;return}requestAnimationFrame(f)};requestAnimationFrame(f)}
@@ -394,6 +421,9 @@ function drawPlan(c,w,h,vw,sc,o){
  if(T.tsura){drawTsura(c,vw,P,b);c.font='10px sans-serif';c.fillStyle='#6a7082'}
  else for(let x=0;x<=b.x1+1e-6;x+=st){for(const xx of x?[x,-x]:[0]){const [a,bb]=P(xx,0);c.fillText(x?x+'':'0',a,bb+3)}}
  c.textAlign='right';c.textBaseline='middle';for(let y=st;y<=b.y1+1e-6;y+=st){const [a,bb]=P(b.x0,y);c.fillText(y+'m',a-3,bb)}
+ // 緞帳
+ if(T.don&&T.don.on){const dn=donAt(sc),[a1,b1]=P(-hw-0.3,0.3),[a2]=P(hw+0.3,0.3);c.strokeStyle=hexA(T.don.color,dn>0.02?1:.45);c.lineWidth=dn>0.02?4:2;c.setLineDash(dn>0.02?[]:[8,5]);c.beginPath();c.moveTo(a1,b1);c.lineTo(a2,b1);c.stroke();c.setLineDash([]);
+  if(o.ui!==false){c.font='600 10px sans-serif';c.fillStyle='#e08890';c.textAlign='left';c.textBaseline='bottom';c.fillText('緞帳 '+(dn<0.02?'上':dn>0.98?'下':Math.round(dn*100)+'%'),a2+4,b1+5)}}
  // バミリ
  for(const m of allMarks())drawMarkPlan(c,vw,m,o.sel===m.id&&o.ui!==false);
  // もの
@@ -427,6 +457,9 @@ function drawItemPlan(c,vw,it,p,isSel,o){
   // 顔の向き（客席向き=下）
   c.beginPath();c.moveTo(-W*0.18,D/2-1);c.lineTo(0,D/2+Math.max(5,D*0.45));c.lineTo(W*0.18,D/2-1);c.fillStyle=kc?'#7a7f8c':it.color;c.fill();
   if(!kc){c.beginPath();c.arc(0,0,Math.min(W,D)*0.28,0,7);c.fillStyle='rgba(255,255,255,.35)';c.fill()}
+ }else if(it.drape){
+  const Dp=Math.max(D,3);for(const [cx,vw2] of drapePanels(it,p.open)){const x0=(cx-vw2/2)*k,x1=(cx+vw2/2)*k;c.fillStyle=hexA(it.color==='#16161b'||it.color==='#101014'?'#3a3d4a':it.color,it.sheer?.35:.85);c.fillRect(x0,-Dp/2,x1-x0,Dp);
+   c.strokeStyle=isSel?'#fff':it.sheer?'rgba(220,225,235,.7)':'rgba(170,175,190,.8)';c.lineWidth=isSel?2:1;c.beginPath();for(let x=x0;x<=x1;x+=4){const yy=Math.sin((x-x0)/3)*Math.max(1.5,Dp/2);x===x0?c.moveTo(x,yy):c.lineTo(x,yy)}c.stroke()}
  }else{
   if(it.shape==='ellipse'){c.beginPath();c.ellipse(0,0,W/2,D/2,0,0,7)}else rr(c,-W/2,-D/2,W,D,2);
   c.fillStyle=hexA(it.color,.75);c.fill();c.lineWidth=isSel?2.5:1;c.strokeStyle=isSel?'#fff':'rgba(0,0,0,.6)';c.stroke();
@@ -456,7 +489,7 @@ function drawMarkPlan(c,vw,m,isSel){const k=vw.k,[sx,sy]=pS(vw,m.x,m.y);c.save()
  for(const [x,y,w,d,a] of markArms(m)){const W=Math.max(w*k,w===0.05?2:3),D=Math.max(d*k,d===0.05?2:3);c.save();c.translate(x*k,y*k);if(a)c.rotate(a*Math.PI/180);c.fillRect(-W/2,-D/2,W,D);c.restore()}
  if(isSel){const r=Math.max((m.size||30)/200*k,7)+5;c.strokeStyle='#4ea1ff';c.lineWidth=1.5;c.setLineDash([3,3]);c.beginPath();c.arc(0,0,r,0,7);c.stroke();c.setLineDash([])}
  c.restore();if(m.label){c.save();c.font='700 10px sans-serif';c.textAlign='left';c.textBaseline='bottom';c.fillStyle=m.color;c.shadowColor='#000';c.shadowBlur=3;c.fillText(m.label,sx+Math.max((m.size||30)/200*k,5)+2,sy-2);c.restore()}}
-function hitMark(sx,sy){if(!showMarks||regionAt(sy)!=='plan')return null;let best=null,bd=1e9;for(const m of doc.marks||[]){const [x,y]=pS(V,m.x,m.y),d=Math.hypot(sx-x,sy-y),r=Math.max((m.size||30)/200*V.k,10);if(d<=r&&d<bd){bd=d;best=m}}return best}
+function hitMark(sx,sy){if(!showMarks||regionAt(sy)!=='plan')return null;let best=null,bd=1e9;for(const m of doc.marks||[]){const [x,y]=pS(V,m.x,m.y),d=Math.hypot(sx-x,sy-y),r=Math.max((m.size||30)/200*V.k,TOUCH?20:10);if(d<=r&&d<bd){bd=d;best=m}}return best}
 function hexA(h,a){const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}
 
 function drawFront(c,w,h,vw,sc,o){
@@ -483,13 +516,21 @@ function drawFront(c,w,h,vw,sc,o){
    if(i%every===0){c.fillStyle=i===0?'#ff6b6b':inS?'#ffd27a':'#8a7a50';c.fillText(i===0?'0':String(i),x,y+Math.max(5,0.15*k)+2)}}}
  // もの（奥から順に）
  const its=doc.items.map(it=>({it,p:posOf(it.id,sc)})).filter(e=>e.p).sort((x,y)=>y.p.y-x.p.y||(x.it.type==='actor')-(y.it.type==='actor'));
- for(const {it,p} of its){const z0=baseZ(it,p,sc);
+ let donDone=false;const drawDon=()=>{donDone=true;if(!(T.don&&T.don.on))return;const dn=donAt(sc);if(dn<0.01)return;const top=T.height,bot=T.height*(1-dn),[x0,y0]=F(-hw-0.2,top),[x1,y1]=F(hw+0.2,bot);
+  c.fillStyle=T.don.color;c.fillRect(x0,y0,x1-x0,y1-y0);c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1;c.beginPath();for(let x=-hw;x<hw;x+=0.35){const [fx]=F(x,0);c.moveTo(fx,y0);c.lineTo(fx,y1)}c.stroke();
+  c.fillStyle='#c9a24a';c.fillRect(x0,y1-Math.max(2,0.08*k),x1-x0,Math.max(2,0.08*k));c.font='700 12px sans-serif';c.fillStyle='rgba(255,255,255,.55)';c.textAlign='center';c.textBaseline='middle';if(y1-y0>20)c.fillText('緞帳',(x0+x1)/2,(y0+y1)/2)};
+ for(const {it,p} of its){const z0=baseZ(it,p,sc);if(!donDone&&p.y<0.3)drawDon();
   // 奥ほど少し暗く（大きさは変えない＝実寸のまま）
   const dim=clamp(1-p.y/Math.max(T.depth,1)*0.35,0.6,1);
   if(it.type==='actor')drawPerson(c,vw,it,p,z0,dim,o.sel===it.id);
+  else if(it.drape){const cr=Math.cos(p.r*Math.PI/180);c.save();c.globalAlpha=p.a*(it.sheer?.38:1);
+   for(const [cx,w2] of drapePanels(it,p.open)){const xa=p.x+(cx-w2/2)*cr,xb=p.x+(cx+w2/2)*cr,[x0,y0]=F(Math.min(xa,xb),z0+it.h/100),[x1,y1]=F(Math.max(xa,xb),z0);c.fillStyle=shade(it.color,dim);c.fillRect(x0,y0,x1-x0,y1-y0);
+    c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1;c.beginPath();for(let x=x0+0.25*k;x<x1;x+=Math.max(3,0.25*k)){c.moveTo(x,y0);c.lineTo(x,y1)}c.stroke();if(o.sel===it.id){c.strokeStyle='#fff';c.lineWidth=2;c.strokeRect(x0,y0,x1-x0,y1-y0)}}
+   c.globalAlpha=p.a;c.font='11px sans-serif';c.textAlign='center';c.textBaseline='bottom';c.fillStyle='#fff';c.shadowColor='#000';c.shadowBlur=3;const [lx,ly]=F(p.x,z0+it.h/100);c.fillText(it.name,lx,ly-2);c.restore()}
   else{const pw=projW(it,p.r)/100,[x0,y0]=F(p.x-pw/2,z0+it.h/100),[x1,y1]=F(p.x+pw/2,z0);c.save();c.globalAlpha=p.a;
    if(it.shape==='ellipse'&&false){}rr(c,x0,y0,x1-x0,y1-y0,2);c.fillStyle=shade(it.color,dim);c.fill();c.lineWidth=o.sel===it.id?2.5:1;c.strokeStyle=o.sel===it.id?'#fff':'rgba(0,0,0,.6)';c.stroke();
    c.font='11px sans-serif';c.textAlign='center';c.textBaseline='bottom';c.fillStyle='#fff';c.shadowColor='#000';c.shadowBlur=3;c.fillText(it.name,(x0+x1)/2,y0-2);c.restore()}}
+ if(!donDone)drawDon();
  // 選択中の高さ
  const s=o.sel&&its.find(e=>e.it.id===o.sel);
  if(s&&o.ui!==false){const z0=baseZ(s.it,s.p,sc),top=z0+s.it.h/100,[x,y]=F(s.p.x,top),[,y0]=F(s.p.x,0),pw=(s.it.type==='actor'?s.it.w:projW(s.it,s.p.r))/100,[xr]=F(s.p.x+pw/2+0.12,0);
@@ -523,19 +564,22 @@ function hitItem(sx,sy){
  const its=doc.items.map(it=>({it,p:posOf(it.id,sc)})).filter(e=>e.p&&e.p.a>.5);
  if(reg==='plan'){its.sort((a,b)=>(b.it.type==='actor')-(a.it.type==='actor'));
   for(const {it,p} of its){const [cx,cy]=pS(V,p.x,p.y),a=-p.r*Math.PI/180,dx=sx-cx,dy=sy-cy,lx=dx*Math.cos(a)-dy*Math.sin(a),ly=dx*Math.sin(a)+dy*Math.cos(a);
-   const hw=Math.max(it.w/200*V.k,10),hd=Math.max(it.d/200*V.k,10);if(Math.abs(lx)<=hw&&Math.abs(ly)<=hd)return {it,p,reg}}}
+   const hw=Math.max(it.w/200*V.k,TOUCH?18:10),hd=Math.max(it.d/200*V.k,TOUCH?18:10);if(Math.abs(lx)<=hw&&Math.abs(ly)<=hd)return {it,p,reg}}}
  else{its.sort((x,y)=>x.p.y-y.p.y||(y.it.type==='actor')-(x.it.type==='actor'));
   for(const {it,p} of its){const z0=baseZ(it,p,sc),pw=(it.type==='actor'?it.w:projW(it,p.r))/100,[x0,y0]=fS(V,p.x-pw/2,z0+it.h/100),[x1,y1]=fS(V,p.x+pw/2,z0);
    if(sx>=Math.min(x0,x1-10)&&sx<=Math.max(x1,x0+10)&&sy>=y0-4&&sy<=y1+4)return {it,p,reg}}}
  return null}
 function hitRot(sx,sy){if(!sel||markOf(sel)||regionAt(sy)!=='plan')return false;const it=item(sel),p=posOf(sel);if(!it||!p)return false;
  const D=it.d/100*V.k,hy=Math.max(D/2,8)+(it.type==='actor'?Math.max(5,D*.45):0)+16,a=p.r*Math.PI/180,[cx,cy]=pS(V,p.x,p.y);
- const hx=cx-Math.sin(a)*hy,hy2=cy+Math.cos(a)*hy;return Math.hypot(sx-hx,sy-hy2)<12}
+ const hx=cx-Math.sin(a)*hy,hy2=cy+Math.cos(a)*hy;return Math.hypot(sx-hx,sy-hy2)<(TOUCH?24:12)}
 
 /* ---------- 操作 ---------- */
-const ptrs=new Map();let drag=null;
+const ptrs=new Map();let drag=null;let TOUCH=matchMedia('(pointer:coarse)').matches;
+const isMobile=()=>matchMedia('(max-width:900px)').matches;
+function closeMobile(){if(isMobile()){$('#left').classList.remove('open');$('#right').classList.remove('open')}}
 const snapv=(v,free)=>free?v:Math.round(v/0.05)*0.05;
 cv.addEventListener('pointerdown',e=>{
+ TOUCH=e.pointerType!=='mouse';if(isMobile()&&($('#left').classList.contains('open')||$('#right').classList.contains('open'))){closeMobile();return}
  cv.setPointerCapture(e.pointerId);const r=cv.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;ptrs.set(e.pointerId,{x:sx,y:sy});
  if(document.body.classList.contains('pres')){if(sx<r.width*0.3)goScene(doc.cur-1,false);else if(doc.cur<doc.scenes.length-1)goScene(doc.cur+1,true);return}
  if(mode==='3d'){down3(e,sx,sy);return}
@@ -595,23 +639,27 @@ function twice(btn,fn,label){btn.addEventListener('click',()=>{if(btn.dataset.ar
 
 /* ---------- 一覧 ---------- */
 PRESETS.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${p[0]}（${p[1]}×${p[2]}×高${p[3]}cm）`;$('#addObj').appendChild(o)});
+HANGS.forEach((h,i)=>{const o=document.createElement('option');o.value=i;o.textContent=h[0];$('#addHang').appendChild(o)});
+$('#addHang').onchange=e=>{const i=e.target.value;e.target.value='';e.target.blur();if(i==='')return;const [nm,kind,col,sheer,split]=HANGS[i],z=hangSize(kind);
+ change(()=>{const it={id:uid(),type:'object',drape:kind!=='panel',kind,name:nm,color:col,w:z.w,d:kind==='panel'?5:5,h:z.h,elev:z.elev,shape:'rect',stand:false,sheer:!!sheer,split:!!split};doc.items.push(it);scene().pos[it.id]={x:z.x,y:z.y,r:0,on:true,open:0};sel=it.id});closeMobile()};
 $('#addObj').onchange=e=>{const i=e.target.value;e.target.value='';e.target.blur();if(i==='')return;const p=PRESETS[i];
- change(()=>{const it={id:uid(),type:'object',name:p[0].replace(/ .*/,''),color:p[4],w:p[1],d:p[2],h:p[3],elev:0,shape:'rect',stand:!!p[5]};doc.items.push(it);scene().pos[it.id]={x:0,y:doc.theater.depth/2,r:0,on:true};sel=it.id})};
+ closeMobile();change(()=>{const it={id:uid(),type:'object',name:p[0].replace(/ .*/,''),color:p[4],w:p[1],d:p[2],h:p[3],elev:0,shape:'rect',stand:!!p[5]};doc.items.push(it);scene().pos[it.id]={x:0,y:doc.theater.depth/2,r:0,on:true};sel=it.id})};
 $('#addKuroko').onclick=()=>change(()=>{const n=doc.items.filter(i=>i.kuroko).length;const it={id:uid(),type:'actor',kuroko:true,name:'クロコ'+(n+1),color:BLACK,h:165,w:44,d:27,elev:0};doc.items.push(it);scene().pos[it.id]={x:0,y:Math.min(2.5,doc.theater.depth/2),r:0,on:true};sel=it.id});
 $('#addMark').onclick=()=>change(()=>{const n=doc.marks.length;const m={id:uid(),label:String(n+1),color:MCOL[n%MCOL.length],shape:'cross',size:30,x:0,y:Math.min(1.5,doc.theater.depth/2),r:0};doc.marks.push(m);showMarks=true;sel=m.id});
+$('#addActor').addEventListener('click',()=>setTimeout(closeMobile,0));$('#addKuroko').addEventListener('click',()=>setTimeout(closeMobile,0));$('#addMark').addEventListener('click',()=>setTimeout(closeMobile,0));
 $('#addActor').onclick=()=>change(()=>{const n=doc.items.filter(i=>i.type==='actor').length;const it={id:uid(),type:'actor',name:'役者'+String.fromCharCode(65+n%26),color:ACOL[n%ACOL.length],h:165,w:44,d:27,elev:0};doc.items.push(it);scene().pos[it.id]={x:0,y:Math.min(2,doc.theater.depth/2),r:0,on:true};sel=it.id});
 function lastPos(id){for(let i=doc.cur;i>=0;i--){const p=doc.scenes[i].pos[id];if(p)return p}for(const s of doc.scenes)if(s.pos[id])return s.pos[id];return null}
 function setOn(id,on){change(()=>{const sc=scene();let p=sc.pos[id];if(!p){const l=lastPos(id);p=sc.pos[id]=l?{...l}:{x:0,y:doc.theater.depth/2,r:0,on:true}}p.on=on})}
 function renderList(){
- const sc=scene();const h=['actor','object'].map(tp=>{const its=doc.items.filter(i=>i.type===tp);if(!its.length)return '';
-  return `<h3 style="margin-top:8px">${tp==='actor'?'役者・クロコ':'舞台セット・小道具'}</h3>`+its.map(it=>{const on=sc.pos[it.id]&&sc.pos[it.id].on;
-   return `<div class="it${sel===it.id?' sel':''}${on?'':' off'}" data-id="${it.id}"><span class="dot${tp==='object'?' sq':''}" style="background:${it.kuroko?BLACK:it.color};${it.kuroko?'box-shadow:0 0 0 1px #7a7f8c':''}"></span><span class="n">${esc(it.name)}</span><span class="s">${tp==='actor'?it.h+'cm':it.w+'×'+it.d}</span><button data-on="${it.id}" class="${on?'on':''}">${on?'出す':'裏'}</button></div>`}).join('')}).join('');
+ const sc=scene();const h=[['actor','役者・クロコ',i=>i.type==='actor'],['object','舞台セット・小道具',i=>i.type==='object'&&!i.drape],['object','吊りもの・幕',i=>i.drape]].map(([tp,ttl,fl])=>{const its=doc.items.filter(fl);if(!its.length)return '';
+  return `<h3 style="margin-top:8px">${ttl}</h3>`+its.map(it=>{const on=sc.pos[it.id]&&sc.pos[it.id].on;
+   return `<div class="it${sel===it.id?' sel':''}${on?'':' off'}" data-id="${it.id}"><span class="dot${tp==='object'?' sq':''}" style="background:${it.kuroko?BLACK:it.color};${it.kuroko?'box-shadow:0 0 0 1px #7a7f8c':''}"></span><span class="n">${esc(it.name)}</span><span class="s">${tp==='actor'?it.h+'cm':it.drape?'幅'+(it.w/100).toFixed(1)+'m':it.w+'×'+it.d}</span><button data-on="${it.id}" class="${on?'on':''}">${on?'出す':'裏'}</button></div>`}).join('')}).join('');
  const mk=(doc.marks||[]);
  $('#list').innerHTML=h+`<h3 style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">バミリ（全シーン共通）<button id="mShow" class="${showMarks?'on':''}" style="padding:2px 8px;font-size:11px">${showMarks?'表示中':'隠し中'}</button></h3>`+
   `<div class="it" style="cursor:default"><span class="dot sq" style="background:#ff3b3b"></span><span class="n">❌ ヘソ（舞台の中央・固定）</span><span class="s">ツラから ${f2(hesoMark().y)}m</span></div>`+
   (mk.length?mk.map(m=>`<div class="it${sel===m.id?' sel':''}" data-id="${m.id}"><span class="dot sq" style="background:${m.color}"></span><span class="n">${esc(m.label||'（名前なし）')}</span><span class="s">${posLabel(m.x).replace(/（.*$/,'')}</span></div>`).join(''):'<p class="note">「＋ バミリ」で床にテープの目印を貼れます。</p>');
  $('#mShow').onclick=()=>{showMarks=!showMarks;renderList();draw()};
- $$('#list .it').forEach(el=>el.onclick=e=>{if(e.target.dataset.on)return;sel=el.dataset.id;renderProps();renderList();draw()});
+ $$('#list .it').forEach(el=>el.onclick=e=>{if(e.target.dataset.on||!el.dataset.id)return;sel=el.dataset.id;renderProps();renderList();draw();if(isMobile()){$('#left').classList.remove('open');$('#right').classList.add('open')}});
  $$('#list [data-on]').forEach(b=>b.onclick=()=>{const id=b.dataset.on,p=scene().pos[id];setOn(id,!(p&&p.on))});
 }
 
@@ -636,25 +684,31 @@ function renderProps(){
   <div class="row"><label>メモ</label></div><textarea data-k="sc.note" rows="4" placeholder="台詞のきっかけ、動きなど">${esc(sc.note||'')}</textarea>
   ${field('転換の速さ','sc.dur',sc.dur,'秒','inputmode="decimal"')}
   <div class="grp"><button id="pPlay">▶ 前のシーンから動きを見る</button></div>
+  ${T.don&&T.don.on?`<h3 style="margin-top:14px">緞帳</h3><div class="grp"><button id="donUp" class="${(sc.don||0)<0.01?'on':''}">上げる</button><button id="donDown" class="${(sc.don||0)>0.99?'on':''}">下ろす</button></div>`+field('下り具合','sc.don',Math.round((sc.don||0)*100),'%','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">シーンが変わると緞帳も動きます</div>':''}
   <h3 style="margin-top:16px">劇場</h3><div class="note">${esc(T.name)}<br>間口 ${f2(T.width)}m × 奥行 ${f2(T.depth)}m × 高さ ${f2(T.height)}m<br>袖 ${f2(T.wing)}m／マス目 ${gridLabel()}${T.ul?'<br>図面あり（縮尺合わせ済み）':''}</div>
   <div class="grp"><button id="pTheater">劇場を変える…</button></div>
   <p class="note">役者や舞台セットをクリックすると、ここで大きさや位置を変えられます。<br>矢印キーで5cmずつ（Shiftで50cm）動かせます。Altを押しながらだと吸着しません。</p>`;
+  if($('#donUp')){$('#donUp').onclick=()=>change(()=>{scene().don=0});$('#donDown').onclick=()=>change(()=>{scene().don=1})}
   $('#pPlay').onclick=()=>{if(doc.cur>0){const c=doc.cur;doc.cur=c-1;goScene(c,true)}};$('#pTheater').onclick=openTheater;
  }else{const p=scene().pos[it.id],on=p&&p.on,A=it.type==='actor';
   el.innerHTML=`<h3>${it.kuroko?'クロコ':A?'役者':'舞台セット・小道具'}</h3>
   ${field('名前','name',it.name,'')}
   ${it.kuroko?'':`<div class="row"><label>色</label><input type="color" data-k="color" value="${it.color}"></div>`}
   ${A?`<div class="row"><label>クロコ</label><input type="checkbox" data-k="kuroko" ${it.kuroko?'checked':''}><span class="note" style="margin:0">全身まっ黒にする</span></div>`:''}
-  ${A?field('身長','h',it.h,'cm','inputmode="decimal"')+field('肩幅','w',it.w,'cm','inputmode="decimal"')+field('体の厚み','d',it.d,'cm','inputmode="decimal"')
+  ${it.drape?field('幅','w',it.w,'cm','inputmode="decimal"')+field('丈（長さ）','h',it.h,'cm','inputmode="decimal"')+field('吊り高さ','elev',it.elev||0,'cm','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">床から幕のすそまで</div>'+
+   `<div class="row"><label>紗（透ける）</label><input type="checkbox" data-k="sheer" ${it.sheer?'checked':''}></div><div class="row"><label>中割</label><input type="checkbox" data-k="split" ${it.split?'checked':''}><span class="note" style="margin:0">真ん中から左右に開く</span></div>`+
+   (it.split&&on?`<h3 style="margin-top:10px">このシーンの開き</h3><div class="grp"><button id="dClose">閉める</button><button id="dOpen">開ける</button></div>`+field('開き','po',Math.round((p.open||0)*100),'%','inputmode="decimal"'):'')
+  :A?field('身長','h',it.h,'cm','inputmode="decimal"')+field('肩幅','w',it.w,'cm','inputmode="decimal"')+field('体の厚み','d',it.d,'cm','inputmode="decimal"')
    :field('幅','w',it.w,'cm','inputmode="decimal"')+field('奥行','d',it.d,'cm','inputmode="decimal"')+field('高さ','h',it.h,'cm','inputmode="decimal"')+
    `<div class="row"><label>形</label><select data-k="shape"><option value="rect"${it.shape!=='ellipse'?' selected':''}>四角</option><option value="ellipse"${it.shape==='ellipse'?' selected':''}>丸</option></select></div>
    <div class="row"><label>乗れる</label><input type="checkbox" data-k="stand" ${it.stand?'checked':''}><span class="note" style="margin:0">上に役者が乗ると正面図で持ち上がる</span></div>`}
-  ${field(A?'足元の高さ':'床からの高さ','elev',it.elev||0,'cm','inputmode="decimal"')}
+  ${it.drape?'':field(A?'足元の高さ':'床からの高さ','elev',it.elev||0,'cm','inputmode="decimal"')}
   <h3 style="margin-top:12px">このシーンでの位置</h3>
   <div class="grp"><button id="pOn" class="${on?'on':''}">${on?'舞台に出ている':'裏にいる（押すと出す）'}</button></div>
   ${on?field('左右','px',f2(p.x),'m','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">センター0、上手が＋、下手が－</div>'+(doc.theater.tsura?'<div class="note" style="margin-top:-4px;color:#ffd27a">いま <span id="posNow">'+esc(posLabel(p.x))+'</span></div>':'')+field('前後','py',f2(p.y),'m','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">舞台のツラから奥へ</div>'+field('向き','pr',p.r,'°','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">0＝客席向き。平面図の青い丸をドラッグでも回せます</div><div class="grp"><button id="pCenter">センターへ</button><button id="pAll">この位置を後のシーンにも</button></div>':''}
   <div class="grp" style="margin-top:14px"><button id="pDup">複製</button><button id="pDel" class="warn">削除（全シーン）</button></div>`;
   $('#pOn').onclick=()=>setOn(it.id,!on);
+  if($('#dClose')){$('#dClose').onclick=()=>change(()=>{scene().pos[it.id].open=0});$('#dOpen').onclick=()=>change(()=>{scene().pos[it.id].open=1})}
   if(on){$('#pCenter').onclick=()=>change(()=>{scene().pos[it.id].x=0});
    $('#pAll').onclick=()=>change(()=>{for(let i=doc.cur+1;i<doc.scenes.length;i++)doc.scenes[i].pos[it.id]={...scene().pos[it.id]}})}
   $('#pDup').onclick=()=>change(()=>{const n={...it,id:uid(),name:it.name+'2'};doc.items.push(n);const q=scene().pos[it.id]||{x:0,y:2,r:0,on:true};scene().pos[n.id]={...q,x:q.x+0.5,on:true};sel=n.id});
@@ -672,8 +726,10 @@ function renderProps(){
 function applyKey(k,v){
  if(k==='sc.title')scene().title=v||'シーン';else if(k==='sc.note')scene().note=v;else if(k==='sc.dur')scene().dur=clamp(num(v,1.2),0,20);
  else if(k.startsWith('m.')){const m=markOf(sel),f=k.slice(2);if(f==='size'){const n=num(v,null);if(n!==null)m.size=clamp(n,5,300)}else m[f]=v}
+ else if(k==='po'){const p=posRef(sel),n=num(v,null);if(n!==null)p.open=clamp(n/100,0,1)}
+ else if(k==='sc.don'){const n=num(v,null);if(n!==null)scene().don=clamp(n/100,0,1)}
  else if(k==='px'||k==='py'||k==='pr'){const p=posRef(sel);const n=num(v,null);if(n!==null){if(k==='pr')p.r=Math.round(((n%360)+540)%360-180);else p[k[1]]=+n.toFixed(3)}}
- else{const it=item(sel);if(k==='kuroko'){it.kuroko=!!v;if(v)it.color=BLACK;else if(it.color===BLACK)it.color=ACOL[0]}else if(['h','w','d','elev'].includes(k)){const n=num(v,null);if(n!==null)it[k]=Math.max(k==='elev'?-500:1,Math.round(n*10)/10)}else it[k]=v}}
+ else{const it=item(sel);if(k==='sheer'||k==='split')it[k]=!!v;else if(k==='kuroko'){it.kuroko=!!v;if(v)it.color=BLACK;else if(it.color===BLACK)it.color=ACOL[0]}else if(['h','w','d','elev'].includes(k)){const n=num(v,null);if(n!==null)it[k]=Math.max(k==='elev'?-500:1,Math.round(n*10)/10)}else it[k]=v}}
 /* ---------- 数値：打ち込み＋ドラッグ（左右に引っぱる） ---------- */
 // 入力欄か左の名前を左右にドラッグすると値が変わる。Shiftで10倍、Altで1/10。クリックだけなら打ち込み。
 function fmtN(v,dec){return dec?(+v).toFixed(dec):String(Math.round(v))}
@@ -692,7 +748,7 @@ function scrub(inp,o){
   addEventListener('pointermove',mv,{passive:false});addEventListener('pointerup',up);addEventListener('pointercancel',up)};
  inp.addEventListener('pointerdown',e=>start(e,false));
  if(lab){lab.classList.add('scrubL');lab.title='左右にドラッグで数値を変えられます';lab.addEventListener('pointerdown',e=>start(e,true))}}
-const SCRUB={px:[.01,2],py:[.01,2],pr:[1,0,-720,720],h:[1,0,1,400],w:[1,0,1,2000],d:[1,0,1,2000],elev:[1,0,-500,1000],'sc.dur':[.1,1,0,20],'m.size':[1,0,5,300]};
+const SCRUB={px:[.01,2],py:[.01,2],pr:[1,0,-720,720],h:[1,0,1,400],w:[1,0,1,2000],d:[1,0,1,2000],elev:[1,0,-500,1000],'sc.dur':[.1,1,0,20],po:[1,0,0,100],'sc.don':[1,0,0,100],'m.size':[1,0,5,300]};
 function liveProps(){const p=sel&&posRef(sel);if(!p)return;const pn=$('#posNow');if(pn)pn.textContent=posLabel(p.x);for(const [k,v] of [['px',f2(p.x)],['py',f2(p.y)],['pr',p.r]]){const i=$(`#props [data-k="${k}"]`);if(i&&document.activeElement!==i)i.value=v}}
 
 /* ---------- シーン（スライド） ---------- */
@@ -723,7 +779,7 @@ $('#bLeft').onclick=()=>{$('#left').classList.toggle('open');$('#right').classLi
 $('#bRight').onclick=()=>{$('#right').classList.toggle('open');$('#left').classList.remove('open')};
 
 /* ---------- 劇場設定 ---------- */
-function openTheater(){const T=doc.theater;$('#tName').value=T.name;$('#tW').value=f2(T.width);$('#tD').value=f2(T.depth);$('#tH').value=f2(T.height);$('#tWing').value=f2(T.wing);$('#tSH').value=f2(T.stageH??0.9);$('#tGrid').value=String(T.grid);$('#tTsura').value=String(T.tsura||0);$('#tTsuraBack').checked=!!T.tsuraBack;renderUlCtl();$('#mTheater').classList.add('show')}
+function openTheater(){const T=doc.theater;$('#tName').value=T.name;$('#tW').value=f2(T.width);$('#tD').value=f2(T.depth);$('#tH').value=f2(T.height);$('#tWing').value=f2(T.wing);$('#tSH').value=f2(T.stageH??0.9);$('#tGrid').value=String(T.grid);$('#tDon').checked=!!(T.don&&T.don.on);$('#tDonC').value=(T.don&&T.don.color)||'#7a1622';$('#tTsura').value=String(T.tsura||0);$('#tTsuraBack').checked=!!T.tsuraBack;renderUlCtl();$('#mTheater').classList.add('show')}
 $('#bTheater').onclick=openTheater;$('#tClose').onclick=()=>{$('#mTheater').classList.remove('show');fitMain()};
 $('#mTheater').addEventListener('pointerdown',e=>{if(e.target.id==='mTheater'){$('#mTheater').classList.remove('show');fitMain()}});
 const tSet=(k,fn)=>{const el=$(k);el.onchange=()=>{change(()=>fn(el.value));openTheater();fitMain()};el.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing)el.blur()}};
@@ -732,6 +788,7 @@ for(const [id,fn,dec,mn,mx] of [['#tW',v=>doc.theater.width=v,2,1,200],['#tD',v=
 tSet('#tName',v=>doc.theater.name=v||'劇場');tSet('#tW',v=>doc.theater.width=clamp(num(v,doc.theater.width),1,200));tSet('#tD',v=>doc.theater.depth=clamp(num(v,doc.theater.depth),1,200));
 tSet('#tH',v=>doc.theater.height=clamp(num(v,doc.theater.height),1,100));tSet('#tSH',v=>doc.theater.stageH=clamp(num(v,0.9),0,5));tSet('#tWing',v=>doc.theater.wing=clamp(num(v,doc.theater.wing),0,50));
 $('#tTsura').onchange=()=>{change(()=>doc.theater.tsura=+$('#tTsura').value)};$('#tTsuraBack').onchange=()=>{change(()=>doc.theater.tsuraBack=$('#tTsuraBack').checked)};
+$('#tDon').onchange=()=>{change(()=>{doc.theater.don=doc.theater.don||{color:'#7a1622'};doc.theater.don.on=$('#tDon').checked})};$('#tDonC').onchange=()=>{change(()=>{doc.theater.don=doc.theater.don||{on:true};doc.theater.don.color=$('#tDonC').value})};
 $('#tGrid').onchange=()=>{change(()=>doc.theater.grid=+$('#tGrid').value)};
 $$('[data-pre]').forEach(b=>b.onclick=()=>{const P={s:[7,5,4,2],m:[12,10,7,4],l:[18,15,9,6]}[b.dataset.pre];change(()=>{Object.assign(doc.theater,{width:P[0],depth:P[1],height:P[2],wing:P[3],outline:null})});openTheater();fitMain()});
 function renderUlCtl(){const T=doc.theater,el=$('#ulCtl');if(!T.ul){el.innerHTML='<p class="note">図面（PDF・画像）を読み込むと、縮尺を合わせて実寸で舞台の下に敷けます。</p>'+(T.outline?'<div class="grp"><button id="olClr" class="warn">舞台の形を四角に戻す</button></div>':'');}
@@ -753,7 +810,7 @@ $('#cCancel').onclick=()=>{$('#cal').classList.remove('show');fitMain()};
 $('#cOpen').onclick=()=>$('#cFile').click();
 $('#cFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
  try{if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){await openPdf(f)}else{C.auto=null;showAuto();const src=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(f)});C.pdf=null;$('#cPdf').style.display='none';await setCalImg(await shrink(src));C.mpp=null;C.scaleFromPdf=false}
-  Object.assign(C,{front:null,back:null,outline:[],meas:[]});$('#cFileV').textContent=f.name;log('図面を開いた',f.name);calUI();calFit();calDraw()}
+  Object.assign(C,{front:null,back:null,outline:[],meas:[],geom:null,scaleLine:null});$('#cFileV').textContent=f.name;log('図面を開いた',f.name);calUI();calFit();calDraw();autoGeom()}
  catch(err){log('図面を開けない',err.message);$('#cFileV').innerHTML='<span style="color:var(--ng)">開けませんでした：'+esc(err.message)+'</span>'}};
 function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('画像を読めません'));i.src=src})}
 async function shrink(src){const i=await loadImg(src),m=Math.max(i.width,i.height);if(m<=6000)return src;const s=6000/m,c=document.createElement('canvas');c.width=i.width*s|0;c.height=i.height*s|0;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(i,0,0,c.width,c.height);C._shrink=s;return c.toDataURL('image/jpeg',0.9)}
@@ -771,8 +828,9 @@ function zen(s){return String(s).normalize('NFKC').replace(/[０-９]/g,c=>Strin
 function toMeters(numStr,unit){const v=parseFloat(String(numStr).replace(/,/g,''));if(!isFinite(v))return null;unit=(unit||'').toLowerCase();
  if(unit==='mm')return v/1000;if(unit==='cm')return v/100;if(unit==='m')return v;if(unit==='尺')return v*0.30303;if(unit==='間')return v*1.81818;return v>=100?v/1000:v}
 async function autoRead(pg){
- C.auto=null;try{
-  const tc=await pg.getTextContent(),items=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({s:zen(i.str),x:i.transform[4],y:i.transform[5],h:Math.abs(i.transform[3])||Math.abs(i.transform[0])||8}));
+ C.auto=null;C.texts=[];try{
+  const vp0=pg.getViewport({scale:C.pdfScale||1}),tc=await pg.getTextContent(),items=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({s:zen(i.str),x:i.transform[4],y:i.transform[5],h:Math.abs(i.transform[3])||Math.abs(i.transform[0])||8}));
+  C.texts=items.map(i=>{const [ix,iy]=vp0.convertToViewportPoint(i.x,i.y);return {s:i.s,ix,iy}});
   if(!items.length){C.auto={none:true};showAuto();return}
   // 行にまとめる
   items.sort((a,b)=>b.y-a.y||a.x-b.x);const lines=[];for(const it of items){const L=lines.find(l=>Math.abs(l.y-it.y)<Math.max(2,it.h*0.5));if(L)L.items.push(it);else lines.push({y:it.y,items:[it]})}
@@ -792,17 +850,69 @@ async function autoRead(pg){
   if(A.scale)$('#cScale').value=A.scale;if(A.height)$('#cH').value=f2(A.height.v);
  }catch(e){log('自動読み取り失敗',e.message);C.auto={err:true}}
  showAuto()}
-function showAuto(){const el=$('#cAuto');if(!el)return;const A=C.auto;if(!A){el.innerHTML='';return}
- if(A.none){el.innerHTML='<p class="note" style="color:var(--wa)">この図面には文字が入っていない（スキャン画像の）ようです。縮尺と点のクリックで合わせてください。</p>';return}
+/* 図面の線から舞台の四角を見つける */
+function findRects(img,exp){
+ const m=Math.max(img.width,img.height),s=Math.min(1,2400/m),W=Math.max(1,Math.round(img.width*s)),H=Math.max(1,Math.round(img.height*s));
+ const cv2=document.createElement('canvas');cv2.width=W;cv2.height=H;const g=cv2.getContext('2d',{willReadFrequently:true});g.fillStyle='#fff';g.fillRect(0,0,W,H);g.drawImage(img,0,0,W,H);
+ const dd=g.getImageData(0,0,W,H).data,dark=new Uint8Array(W*H);for(let i=0,j=0;i<dark.length;i++,j+=4)dark[i]=(dd[j]*0.3+dd[j+1]*0.59+dd[j+2]*0.11)<150?1:0;
+ const minLen=Math.round(Math.min(W,H)*0.08),gap=3;
+ const runs=horiz=>{const N=horiz?H:W,L=horiz?W:H,segs=[],open=new Map();
+  for(let a=0;a<N;a++){let st=-1,last=-1;const cur=[];
+   for(let b=0;b<=L;b++){const v=b<L&&(horiz?dark[a*W+b]:dark[b*W+a]);if(v){if(st<0)st=b;last=b}else if(st>=0&&b-last>gap){if(last-st+1>=minLen)cur.push([st,last]);st=-1}}
+   for(const [b0,b1] of cur){let hit=null;for(const sg of segs){if(a-sg.a1<=2&&Math.abs(sg.b0-b0)<=4&&Math.abs(sg.b1-b1)<=4){hit=sg;break}}if(hit){hit.a1=a}else segs.push({a0:a,a1:a,b0,b1})}}
+  return segs.filter(z=>z.a1-z.a0<=Math.max(12,minLen*0.2)).map(z=>({a:(z.a0+z.a1)/2,b0:z.b0,b1:z.b1,len:z.b1-z.b0}))};
+ const hs=runs(true).sort((p,q)=>q.len-p.len).slice(0,160),vs=runs(false).sort((p,q)=>q.len-p.len).slice(0,160),tol=Math.max(5,Math.min(W,H)*0.01);
+ const hasV=(x,y0,y1)=>vs.some(v=>Math.abs(v.a-x)<=tol&&v.b0<=y0+tol*2&&v.b1>=y1-tol*2);
+ const xEnds=(t,b)=>{// 上下の線の重なりの中で、縦線がある左右の端を探す
+  const lo=Math.max(t.b0,b.b0),hi=Math.min(t.b1,b.b1);if(hi-lo<minLen)return null;const y0=Math.min(t.a,b.a),y1=Math.max(t.a,b.a);
+  const xs=vs.filter(v=>v.a>=lo-tol&&v.a<=hi+tol&&v.b0<=y0+tol*2&&v.b1>=y1-tol*2).map(v=>v.a).sort((p,q)=>p-q);if(xs.length<2)return null;return [xs[0],xs[xs.length-1]]};
+ const out=[];
+ for(let i=0;i<hs.length;i++)for(let j=i+1;j<hs.length;j++){const t=hs[i],b=hs[j];if(Math.abs(t.a-b.a)<minLen)continue;const e=xEnds(t,b);if(!e)continue;
+  const x0=e[0],x1=e[1],y0=Math.min(t.a,b.a),y1=Math.max(t.a,b.a),w=x1-x0,h=y1-y0;if(w<minLen||h<minLen)continue;if(w>W*0.9||h>H*0.9)continue;
+  out.push({x0:x0/s,x1:x1/s,y0:y0/s,y1:y1/s})}
+ return out}
+function setSide(side,quiet){const r=C.geomRect;if(!r)return;const P={bottom:[[r.x0,r.y1],[r.x1,r.y1],[(r.x0+r.x1)/2,r.y0]],top:[[r.x1,r.y0],[r.x0,r.y0],[(r.x0+r.x1)/2,r.y1]],left:[[r.x0,r.y0],[r.x0,r.y1],[r.x1,(r.y0+r.y1)/2]],right:[[r.x1,r.y1],[r.x1,r.y0],[r.x0,(r.y0+r.y1)/2]]}[side];
+ const oldL=C.front?Math.hypot(C.front[1][0]-C.front[0][0],C.front[1][1]-C.front[0][1]):0;C.front=[P[0],P[1]];C.back=P[2];
+ if(C.geom){C.geom.side=side;const nl=Math.hypot(P[1][0]-P[0][0],P[1][1]-P[0][1]);if(!C.scaleFromPdf&&C.mpp&&oldL&&C.auto&&C.auto.width&&Math.abs(nl-oldL)>1)C.mpp=C.auto.width.v/nl}
+ if(!quiet){showAuto();calUI();calDraw()}}
+function autoGeom(){
+ if(!C.img)return;const A=C.auto||{};
+ let rects=[];try{rects=findRects(C.img)}catch(e){log('線の読み取り失敗',e.message)}
+ C.geom=null;if(!rects.length){showAuto();return}
+ const expW=A.width&&A.width.v,expD=A.depth&&A.depth.v;let best=null;
+ for(const r of rects){const w=r.x1-r.x0,h=r.y1-r.y0;
+  for(const rot of [false,true]){const sw=rot?h:w,sd=rot?w:h;let err=null;
+   if(C.mpp&&(expW||expD)){err=0;let n=0;if(expW){err+=Math.abs(sw*C.mpp-expW)/expW;n++}if(expD){err+=Math.abs(sd*C.mpp-expD)/expD;n++}err/=n}
+   else if(!C.mpp&&expW&&expD){err=Math.abs((sd/sw)-(expD/expW))/(expD/expW)}
+   const score=err===null?-(w*h):err;if(err!==null&&err>0.15)continue;if(!best||score<best.score)best={r,rot,err,score}}}
+ if(!best){showAuto();return}
+ const r=best.r;
+ // 客席の向き：「客席」の文字に近い辺をツラにする
+ let side=best.rot?'left':'bottom';const kt=(C.texts||[]).find(t=>/客席|客 席|AUDIENCE/i.test(t.s));
+ if(kt){const cx=(r.x0+r.x1)/2,cy=(r.y0+r.y1)/2,dx=kt.ix-cx,dy=kt.iy-cy;side=Math.abs(dx)/(r.x1-r.x0)>Math.abs(dy)/(r.y1-r.y0)?(dx<0?'left':'right'):(dy<0?'top':'bottom')}
+ C.geomRect=r;setSide(side,true);
+ const P0={bottom:[[r.x0,r.y1],[r.x1,r.y1],[(r.x0+r.x1)/2,r.y0]],top:[[r.x1,r.y0],[r.x0,r.y0],[(r.x0+r.x1)/2,r.y1]],left:[[r.x0,r.y0],[r.x0,r.y1],[r.x1,(r.y0+r.y1)/2]],right:[[r.x1,r.y1],[r.x1,r.y0],[r.x0,(r.y0+r.y1)/2]]}[side];
+ const fl=Math.hypot(C.front[1][0]-C.front[0][0],C.front[1][1]-C.front[0][1]);
+ if(!C.mpp&&expW){C.mpp=expW/fl;C.scaleFromPdf=false;log('間口の数字から縮尺を決めた')}
+ C.geom={side,conf:(best.err!==null&&best.err<0.08)?'high':'mid',err:best.err};
+ log('舞台の四角を見つけた',side,best.err===null?'':'誤差'+(best.err*100).toFixed(1)+'%');
+ showAuto();calUI();calDraw();
+ if(C.mpp&&C.geom.conf==='high'){setTimeout(()=>{if(!$('#cal').classList.contains('show'))return;$('#cApply').click();toast('図面から劇場を自動で作りました（↶で戻せます）')},700)}}
+function showAuto(){const el=$('#cAuto');if(!el)return;const A=C.auto||(C.geom?{}:null);if(!A){el.innerHTML='';return}
+ if(A.none&&!C.geom){el.innerHTML='<p class="note" style="color:var(--wa)">この図面には文字が入っていない（スキャン画像の）ようです。縮尺と点のクリックで合わせてください。</p>';return}
  if(A.err){el.innerHTML='<p class="note" style="color:var(--wa)">文字を読み取れませんでした。縮尺と点のクリックで合わせてください。</p>';return}
  const row=(n,o,u)=>o?`<div>${n}：<b>${f2(o.v)}</b> m <span style="color:var(--mu)">（「${esc(o.src)}」）</span></div>`:`<div style="color:var(--mu)">${n}：見つからず</div>`;
  el.innerHTML=`<div class="step" style="border-color:var(--ok);margin-top:8px"><div class="t">図面から自動で読み取りました</div>
-  <div>縮尺：${A.scale?'<b>1/'+A.scale+'</b>（自動で入れました）':'<span style="color:var(--mu)">見つからず（下に入れてください）</span>'}</div>
-  ${row('間口',A.width)}${row('奥行',A.depth)}${row('高さ',A.height)}${A.stageH?row('舞台の高さ',A.stageH):''}
-  <p class="note" style="margin:6px 0 0">${A.width||A.depth?'このまま「劇場に反映」で大きさが入ります。図面を舞台に重ねたいときは「3. 間口」の2点も選んでください。':'寸法の文字が見つからないので、3〜4の手順で点を選んでください。'}</p></div>`;
+  <div>縮尺：${!C.pdf?'<span style="color:var(--mu)">画像なので間口の長さで合わせます</span>':A.scale?'<b>1/'+A.scale+'</b>（自動で入れました）':'<span style="color:var(--mu)">見つからず（下に入れてください）</span>'}</div>
+  ${C.auto?row('間口',A.width)+row('奥行',A.depth)+row('高さ',A.height)+(A.stageH?row('舞台の高さ',A.stageH):''):''}
+  ${C.geom?`<div style="margin-top:4px">舞台の位置：<b>見つけました</b></div><div class="row" style="margin:4px 0 0"><label>客席の側</label><div class="seg">${[['bottom','下'],['top','上'],['left','左'],['right','右']].map(([k,n])=>`<button data-side="${k}" class="${C.geom.side===k?'on':''}">${n}</button>`).join('')}</div></div>`:''}
+  ${C.geom&&!C.mpp?`<div class="row" style="margin-top:6px"><label>間口は？</label><input type="text" inputmode="decimal" id="cAutoW" placeholder="例 10.9"><span class="u">m</span><button id="cAutoWok" class="pri">決定</button></div>`:''}
+  <p class="note" style="margin:6px 0 0">${C.geom&&C.mpp&&C.geom.conf==='high'?'自動で劇場に反映します…':C.geom&&C.mpp?'位置を確かめて「劇場に反映」を押してください。':C.geom?'客席の側を確かめて、間口の長さを入れると反映します。':A.width||A.depth?'このまま「劇場に反映」で大きさが入ります。図面を舞台に重ねたいときは「3. 間口」の2点も選んでください。':'寸法の文字が見つからないので、3〜4の手順で点を選んでください。'}</p></div>`;
+ $$('#cAuto [data-side]').forEach(b=>b.onclick=()=>setSide(b.dataset.side));
+ const ok=$('#cAutoWok');if(ok){const go=()=>{const v=num($('#cAutoW').value,0);if(v>0&&C.front){C.mpp=v/Math.hypot(C.front[1][0]-C.front[0][0],C.front[1][1]-C.front[0][1]);C.scaleFromPdf=false;C.geom.conf='high';calUI();$('#cApply').click();toast('図面から劇場を作りました（↶で戻せます）')}};ok.onclick=go;$('#cAutoW').onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing)go()}}
  calUI()}
 function applyPdfScale(){if(!C.pdf)return;const den=num($('#cScale').value,100);C.mpp=(25.4/72/C.pdfScale)*den/1000;C.scaleFromPdf=true;calUI();calDraw()}
-$('#cPage').onchange=async()=>{try{await renderPdfPage();Object.assign(C,{front:null,back:null,outline:[]});calUI();calFit();calDraw()}catch(e){log('PDFページ',e.message)}};
+$('#cPage').onchange=async()=>{try{await renderPdfPage();Object.assign(C,{front:null,back:null,outline:[],geom:null});calUI();calFit();calDraw();autoGeom()}catch(e){log('PDFページ',e.message)}};
 $('#cScale').onchange=applyPdfScale;
 $$('[data-cm]').forEach(b=>b.onclick=()=>{if(!C.img){$('#cFileV').textContent='先に図面を開いてください';return}C.mode=b.dataset.cm;C.pts=[];if(C.mode==='outline')C.outline=C.outline||[];if(C.mode==='measure')C.meas=[];$('#cLenRow').style.display='none';calUI();calDraw()});
 $('#cOlUndo').onclick=()=>{C.outline.pop();calUI();calDraw()};$('#cOlClr').onclick=()=>{C.outline=[];calUI();calDraw()};
@@ -861,7 +971,7 @@ $('#cApply').onclick=()=>{const r=calRes(),A=C.auto||{};
  if(!r.width&&!(A.width||A.depth||A.height))return;
  if(!C.front){change(()=>{const T=doc.theater;if(A.width)T.width=A.width.v;if(A.depth)T.depth=A.depth.v;T.height=clamp(num($('#cH').value,T.height),1,100);if(A.stageH)T.stageH=A.stageH.v;T.outline=null});
   log('図面の数字を反映',`間口${f2(doc.theater.width)} 奥行${f2(doc.theater.depth)} 高さ${f2(doc.theater.height)}`);$('#cal').classList.remove('show');fitMain();return}
- if(A.width)r.width=A.width.v;if(A.depth&&!(r.depth>0.3))r.depth=A.depth.v;if(A.stageH)doc.theater.stageH=A.stageH.v;
+ if(A.width)r.width=A.width.v;if(A.depth)r.depth=A.depth.v;if(A.stageH)doc.theater.stageH=A.stageH.v;
  const o=calOrigin();
  change(()=>{const T=doc.theater;T.width=+r.width.toFixed(3);if(r.depth>0.3)T.depth=+r.depth.toFixed(3);else if(r.outline)T.depth=+Math.max(...r.outline.map(q=>q[1])).toFixed(3);
   T.height=clamp(num($('#cH').value,T.height),1,100);T.outline=r.outline?r.outline.map(q=>[+q[0].toFixed(3),+q[1].toFixed(3)]):null;
@@ -1054,10 +1164,18 @@ function draw3d(){
  const solid=its.filter(e=>e.p.a>=0.999),fade=its.filter(e=>e.p.a<0.999);
  const drawIt=({it,p})=>{const z0=baseZ(it,p,sc);
   if(it.type==='actor'){drawPerson3(it,p,z0,sel===it.id,p.a);return}
+  if(it.drape){const B=itemM(it,p,z0),d=Math.max(it.d/100,0.03),hh=it.h/100,al=p.a*(it.sheer?.35:1);if(it.sheer){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false)}
+   for(const [cx,w2] of drapePanels(it,p.open)){const n=Math.max(1,Math.round(w2/0.22)),sw=w2/n;for(let i=0;i<n;i++){const x=cx-w2/2+sw*(i+0.5);dm(G3.m.box,chain(B,M4.t(x,0,(i%2?0.03:-0.03)),M4.s(sw*1.08,hh,d)),i%2?shade(it.color,0.8):it.color,{a:al})}}
+   if(it.sheer){gl.depthMask(true);gl.disable(gl.BLEND)}
+   if(sel===it.id){const w=it.w/200+0.05,B2=itemM(it,p,z0+0.01),pts=[[-w,0,-0.12],[w,0,-0.12],[w,0,0.12],[-w,0,0.12],[-w,0,-0.12]].map(q=>{const v=M4.mul(B2,M4.t(...q));return [v[12],v[13],v[14]]});line3(pts,'#4ea1ff',1,gl.LINE_STRIP)}return}
   const M=chain(itemM(it,p,z0),M4.s(it.w/100,it.h/100,it.d/100));dm(it.shape==='ellipse'?G3.m.cyl:G3.m.box,M,it.color,{a:p.a});
   if(sel===it.id){const w=it.w/200+0.05,d=it.d/200+0.05,B=itemM(it,p,z0+it.h/100+0.01),pts=[[-w,0,-d],[w,0,-d],[w,0,d],[-w,0,d],[-w,0,-d]].map(q=>{const v=M4.mul(B,M4.t(...q));return [v[12],v[13],v[14]]});line3(pts,'#4ea1ff',1,gl.LINE_STRIP)}};
  solid.forEach(drawIt);
  if(fade.length){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);fade.forEach(drawIt);gl.disable(gl.BLEND)}
+ // 緞帳
+ if(T.don&&T.don.on){const dn=donAt(sc),bot=T.height*(1-dn),hh=T.height+1.2-bot,W2=T.width+0.6,n=Math.round(W2/0.3),sw=W2/n;
+  if(dn>0.005){for(let i=0;i<n;i++)dm(G3.m.box,BX(-W2/2+sw*i-0.01,bot,-0.28+(i%2?0.035:-0.035),-W2/2+sw*(i+1)+0.01,bot+hh,-0.36+(i%2?0.035:-0.035)),i%2?shade(T.don.color,0.78):T.don.color);
+   dm(G3.m.box,BX(-W2/2,bot,-0.25,W2/2,bot+0.1,-0.4),'#c9a24a')}}
  // ピンスポット
  if(spots){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);
   for(const {it,p} of its){if(it.type!=='actor'||it.kuroko)continue;const z0=baseZ(it,p,sc),R=0.85,hT=T.height+1-z0;
