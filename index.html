@@ -192,7 +192,7 @@ body.pres #present,body.pres #pexit{display:block}
    <div id="cPdf" style="display:none"><div class="row"><label>ページ</label><input type="text" inputmode="numeric" id="cPage" value="1"><span class="u" id="cPages"></span></div>
    <div class="row"><label>縮尺 1 /</label><input type="text" inputmode="numeric" id="cScale" value="100"></div>
    <p class="note">PDFは縮尺を入れるだけで実寸になります（図面に書かれた縮尺。A3で1/100など）。</p></div>
-   <div class="v" id="cFileV"></div></div>
+   <div class="v" id="cFileV"></div><div id="cAuto"></div></div>
   <div class="step" id="s2"><div class="t">2. 縮尺を合わせる <button data-cm="scale">2点を選ぶ</button></div>
    <div class="note">寸法がわかっている線の両端をクリック → 実際の長さを入力。PDFで縮尺を入れた場合は不要。</div>
    <div id="cLenRow" class="row" style="display:none"><label>実際の長さ</label><input type="text" inputmode="decimal" id="cLen"><span class="u">m</span><button id="cLenOk" class="pri">決定</button></div>
@@ -217,7 +217,7 @@ body.pres #present,body.pres #pexit{display:block}
 
 <script>
 'use strict';
-const VER='1.3.2';
+const VER='1.4.0';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -752,7 +752,7 @@ function openCal(){Object.assign(C,{mode:null,pts:[],meas:[]});$('#cH').value=f2
 $('#cCancel').onclick=()=>{$('#cal').classList.remove('show');fitMain()};
 $('#cOpen').onclick=()=>$('#cFile').click();
 $('#cFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
- try{if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){await openPdf(f)}else{const src=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(f)});C.pdf=null;$('#cPdf').style.display='none';await setCalImg(await shrink(src));C.mpp=null;C.scaleFromPdf=false}
+ try{if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){await openPdf(f)}else{C.auto=null;showAuto();const src=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(f)});C.pdf=null;$('#cPdf').style.display='none';await setCalImg(await shrink(src));C.mpp=null;C.scaleFromPdf=false}
   Object.assign(C,{front:null,back:null,outline:[],meas:[]});$('#cFileV').textContent=f.name;log('図面を開いた',f.name);calUI();calFit();calDraw()}
  catch(err){log('図面を開けない',err.message);$('#cFileV').innerHTML='<span style="color:var(--ng)">開けませんでした：'+esc(err.message)+'</span>'}};
 function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('画像を読めません'));i.src=src})}
@@ -765,7 +765,42 @@ async function openPdf(f){
  const buf=await f.arrayBuffer();C.pdf=await pdfjsLib.getDocument({data:buf}).promise;$('#cPdf').style.display='';$('#cPages').textContent='/ '+C.pdf.numPages;$('#cPage').value=1;await renderPdfPage()}
 async function renderPdfPage(){if(!C.pdf)return;const n=clamp(num($('#cPage').value,1)|0,1,C.pdf.numPages);$('#cPage').value=n;const pg=await C.pdf.getPage(n),v1=pg.getViewport({scale:1});
  const sc=Math.min(5000/Math.max(v1.width,v1.height),8),vp=pg.getViewport({scale:sc}),c=document.createElement('canvas');c.width=vp.width|0;c.height=vp.height|0;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
- await pg.render({canvasContext:g,viewport:vp}).promise;await setCalImg(c.toDataURL('image/jpeg',0.9));C.pdfScale=sc;applyPdfScale()}
+ await pg.render({canvasContext:g,viewport:vp}).promise;await setCalImg(c.toDataURL('image/jpeg',0.9));C.pdfScale=sc;C.page=pg;await autoRead(pg);applyPdfScale()}
+/* 図面の文字から自動で読み取る（PDFのみ） */
+function zen(s){return String(s).normalize('NFKC').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[．]/g,'.').replace(/[，]/g,',').replace(/[／]/g,'/').replace(/[：]/g,':').replace(/[＝]/g,'=').replace(/ｍ/g,'m').replace(/ｃ/g,'c')}
+function toMeters(numStr,unit){const v=parseFloat(String(numStr).replace(/,/g,''));if(!isFinite(v))return null;unit=(unit||'').toLowerCase();
+ if(unit==='mm')return v/1000;if(unit==='cm')return v/100;if(unit==='m')return v;if(unit==='尺')return v*0.30303;if(unit==='間')return v*1.81818;return v>=100?v/1000:v}
+async function autoRead(pg){
+ C.auto=null;try{
+  const tc=await pg.getTextContent(),items=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({s:zen(i.str),x:i.transform[4],y:i.transform[5],h:Math.abs(i.transform[3])||Math.abs(i.transform[0])||8}));
+  if(!items.length){C.auto={none:true};showAuto();return}
+  // 行にまとめる
+  items.sort((a,b)=>b.y-a.y||a.x-b.x);const lines=[];for(const it of items){const L=lines.find(l=>Math.abs(l.y-it.y)<Math.max(2,it.h*0.5));if(L)L.items.push(it);else lines.push({y:it.y,items:[it]})}
+  const txt=lines.map(l=>l.items.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ')).join('\n'),flat=txt.replace(/\s+/g,'');
+  const A={};
+  const sm=flat.match(/(?:S|SCALE|縮尺)[=:]?1[\/:](\d{2,4})/i)||flat.match(/(?:^|[^\d.])1\/(50|100|150|200|250|300|400|500|1000)(?![\d])/);
+  if(sm)A.scale=+sm[1];
+  const NUM='(\\d[\\d,]*(?:\\.\\d+)?)(mm|cm|m|尺|間)?';
+  const find=(keys,lo,hi)=>{for(const k of keys){const re=new RegExp('(?:'+k+')[^\\d\\n]{0,8}'+NUM,'g');let m;while((m=re.exec(flat))){const v=toMeters(m[1],m[2]);if(v!==null&&v>=lo&&v<=hi)return {v:+v.toFixed(3),src:m[0]}}}return null};
+  A.width=find(['プロセニアム間口','舞台間口','間口','プロセニアム幅','開口幅','舞台幅'],1.5,60);
+  A.depth=find(['舞台奥行き','舞台奥行','奥行き','奥行'],1.5,60);
+  A.height=find(['プロセニアム高さ','プロセニアム高','額縁高さ','額縁高','開口高さ','開口高','間口高さ','舞台高さ'],1.5,30);
+  // 「舞台高さ」は客席からの舞台面の高さのこともあるので、低いものは舞台の高さとして扱う
+  if(A.height&&A.height.v<1.5)A.height=null;
+  A.stageH=find(['舞台面高さ','舞台床高','ステージ高さ','舞台高'],0.2,1.5);
+  C.auto=A;log('図面の自動読み取り',JSON.stringify({scale:A.scale,w:A.width&&A.width.v,d:A.depth&&A.depth.v,h:A.height&&A.height.v}));
+  if(A.scale)$('#cScale').value=A.scale;if(A.height)$('#cH').value=f2(A.height.v);
+ }catch(e){log('自動読み取り失敗',e.message);C.auto={err:true}}
+ showAuto()}
+function showAuto(){const el=$('#cAuto');if(!el)return;const A=C.auto;if(!A){el.innerHTML='';return}
+ if(A.none){el.innerHTML='<p class="note" style="color:var(--wa)">この図面には文字が入っていない（スキャン画像の）ようです。縮尺と点のクリックで合わせてください。</p>';return}
+ if(A.err){el.innerHTML='<p class="note" style="color:var(--wa)">文字を読み取れませんでした。縮尺と点のクリックで合わせてください。</p>';return}
+ const row=(n,o,u)=>o?`<div>${n}：<b>${f2(o.v)}</b> m <span style="color:var(--mu)">（「${esc(o.src)}」）</span></div>`:`<div style="color:var(--mu)">${n}：見つからず</div>`;
+ el.innerHTML=`<div class="step" style="border-color:var(--ok);margin-top:8px"><div class="t">図面から自動で読み取りました</div>
+  <div>縮尺：${A.scale?'<b>1/'+A.scale+'</b>（自動で入れました）':'<span style="color:var(--mu)">見つからず（下に入れてください）</span>'}</div>
+  ${row('間口',A.width)}${row('奥行',A.depth)}${row('高さ',A.height)}${A.stageH?row('舞台の高さ',A.stageH):''}
+  <p class="note" style="margin:6px 0 0">${A.width||A.depth?'このまま「劇場に反映」で大きさが入ります。図面を舞台に重ねたいときは「3. 間口」の2点も選んでください。':'寸法の文字が見つからないので、3〜4の手順で点を選んでください。'}</p></div>`;
+ calUI()}
 function applyPdfScale(){if(!C.pdf)return;const den=num($('#cScale').value,100);C.mpp=(25.4/72/C.pdfScale)*den/1000;C.scaleFromPdf=true;calUI();calDraw()}
 $('#cPage').onchange=async()=>{try{await renderPdfPage();Object.assign(C,{front:null,back:null,outline:[]});calUI();calFit();calDraw()}catch(e){log('PDFページ',e.message)}};
 $('#cScale').onchange=applyPdfScale;
@@ -788,7 +823,7 @@ function calUI(){
  if(C.meas.length===2)$('#cMeasV').innerHTML=C.mpp?'<span class="big">'+f2(Math.hypot(C.meas[1][0]-C.meas[0][0],C.meas[1][1]-C.meas[0][1])*C.mpp)+'</span> m':'縮尺を合わせると長さが出ます';
  const msg={scale:'寸法がわかっている線の 端 をクリック（'+(C.pts.length+1)+'点目）',front:C.pts.length?'次に 上手（右）の端 をクリック':'舞台のツラの 下手（左）の端 をクリック',back:'舞台のいちばん奥をクリック',outline:'舞台の角を順にクリック（終わったら別のボタンへ）',measure:'測りたい2点をクリック'}[act];
  $('#calMsg').textContent=msg||(C.img?'ドラッグで移動・ホイール／ピンチで拡大。右のボタンで手順を選んでください':'右の「画像・PDFを選ぶ」から図面を開いてください');
- $('#cApply').disabled=!(C.img&&C.mpp&&C.front);
+ $('#cApply').disabled=!((C.img&&C.mpp&&C.front)||(C.auto&&(C.auto.width||C.auto.depth||C.auto.height)));
 }
 function calFit(){const r=ccv.getBoundingClientRect();if(!C.img)return;const k=Math.min(r.width/C.img.width,r.height/C.img.height)*0.95;C.v={k,ox:(r.width-C.img.width*k)/2,oy:(r.height-C.img.height*k)/2}}
 function calDraw(){const r=ccv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;ccv.width=r.width*dpr;ccv.height=r.height*dpr;const g=cctx;g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#0a0b10';g.fillRect(0,0,r.width,r.height);
@@ -822,7 +857,12 @@ function calClick(p){
  else if(m==='outline'){C.outline.push(p)}
  else if(m==='measure'){if(C.meas.length>=2)C.meas=[];C.meas.push(p)}
  calUI();calDraw()}
-$('#cApply').onclick=()=>{const r=calRes();if(!r.width)return;const o=calOrigin();
+$('#cApply').onclick=()=>{const r=calRes(),A=C.auto||{};
+ if(!r.width&&!(A.width||A.depth||A.height))return;
+ if(!C.front){change(()=>{const T=doc.theater;if(A.width)T.width=A.width.v;if(A.depth)T.depth=A.depth.v;T.height=clamp(num($('#cH').value,T.height),1,100);if(A.stageH)T.stageH=A.stageH.v;T.outline=null});
+  log('図面の数字を反映',`間口${f2(doc.theater.width)} 奥行${f2(doc.theater.depth)} 高さ${f2(doc.theater.height)}`);$('#cal').classList.remove('show');fitMain();return}
+ if(A.width)r.width=A.width.v;if(A.depth&&!(r.depth>0.3))r.depth=A.depth.v;if(A.stageH)doc.theater.stageH=A.stageH.v;
+ const o=calOrigin();
  change(()=>{const T=doc.theater;T.width=+r.width.toFixed(3);if(r.depth>0.3)T.depth=+r.depth.toFixed(3);else if(r.outline)T.depth=+Math.max(...r.outline.map(q=>q[1])).toFixed(3);
   T.height=clamp(num($('#cH').value,T.height),1,100);T.outline=r.outline?r.outline.map(q=>[+q[0].toFixed(3),+q[1].toFixed(3)]):null;
   T.ul={mpp:C.mpp,ox:o[0],oy:o[1],rot:calTheta(),opacity:T.ul?T.ul.opacity:0.5,show:true}});
