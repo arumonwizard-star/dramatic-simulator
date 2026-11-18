@@ -26,6 +26,9 @@ button.armed{background:var(--ng);border-color:var(--ng);color:#fff}
 button:disabled{opacity:.4;cursor:default}
 input[type=text],textarea,select{font:inherit;color:var(--tx);background:#10121a;border:1px solid var(--ln);border-radius:6px;padding:5px 7px;width:100%}
 input[type=text]:focus,textarea:focus{outline:none;border-color:var(--ac)}
+input.scrub{touch-action:pan-y}input.scrub:not(:focus){cursor:ew-resize}input.scrub:not(:focus):hover{border-color:#47506a}
+label.scrubL{cursor:ew-resize;touch-action:pan-y;text-decoration:underline dotted #4a5066;text-underline-offset:3px}
+body.scrubbing,body.scrubbing *{cursor:ew-resize!important;-webkit-user-select:none!important;user-select:none!important}
 input[type=color]{width:34px;height:28px;border:1px solid var(--ln);border-radius:6px;background:none;padding:1px}
 #app{display:grid;grid-template-rows:46px 1fr 104px;grid-template-columns:230px 1fr 260px;height:100%;padding-top:env(safe-area-inset-top)}
 header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid var(--ln);background:var(--pn);overflow-x:auto}
@@ -120,7 +123,7 @@ body.pres #present,body.pres #pexit{display:block}
 <aside id="left">
  <h3>出るもの（このシーン）</h3>
  <div class="grp"><button id="addActor">＋ 役者</button><button id="addKuroko">＋ クロコ</button><button id="addMark">＋ バミリ</button>
- <select id="addObj" style="width:auto;flex:1"><option value="">＋ 舞台セット・小道具…</option></select></div>
+ <select id="addObj" style="flex:1 1 100%;min-width:0"><option value="">＋ 舞台セット・小道具…</option></select></div>
  <div id="list"></div>
  <p class="note">「出す／裏」はシーンごと。裏にしたものは図に出ません。</p>
 </aside>
@@ -214,7 +217,7 @@ body.pres #present,body.pres #pexit{display:block}
 
 <script>
 'use strict';
-const VER='1.3.0';
+const VER='1.3.1';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -656,15 +659,37 @@ function renderProps(){
  }
  el.querySelectorAll('[data-k]').forEach(inp=>{
   const commit=()=>{const k=inp.dataset.k;let v=inp.type==='checkbox'?inp.checked:inp.value;
-   change(()=>{
-    if(k==='sc.title')scene().title=v||'シーン';else if(k==='sc.note')scene().note=v;else if(k==='sc.dur')scene().dur=clamp(num(v,1.2),0,20);
-    else if(k.startsWith('m.')){const m=markOf(sel),f=k.slice(2);if(f==='size'){const n=num(v,null);if(n!==null)m.size=clamp(n,5,300)}else m[f]=v}
-    else if(k==='px'||k==='py'||k==='pr'){const p=posRef(sel);const n=num(v,null);if(n!==null){if(k==='pr')p.r=Math.round(((n%360)+540)%360-180);else p[k[1]]=n}}
-    else{const it=item(sel);if(k==='kuroko'){it.kuroko=!!v;if(v)it.color=BLACK;else if(it.color===BLACK)it.color=ACOL[0]}else if(['h','w','d','elev'].includes(k)){const n=num(v,null);if(n!==null)it[k]=Math.max(k==='elev'?-500:1,Math.round(n*10)/10)}else it[k]=v}
-   });};
+   change(()=>applyKey(k,v));};
   if(inp.type==='color'||inp.type==='checkbox'||inp.tagName==='SELECT')inp.onchange=commit;else{inp.onchange=commit;if(inp.tagName==='INPUT')inp.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing)inp.blur()}}
+  const sp=SCRUB[inp.dataset.k];if(sp&&inp.type==='text')scrub(inp,{step:sp[0],dec:sp[1],min:sp[2],max:sp[3],
+   live:v=>{applyKey(inp.dataset.k,String(v));draw();if(['px','py','pr'].includes(inp.dataset.k)){liveProps();if(inp.dataset.k==='pr')inp.value=posRef(sel).r}},
+   end:()=>{save();renderThumb(doc.cur);renderList()}});
  });
 }
+function applyKey(k,v){
+ if(k==='sc.title')scene().title=v||'シーン';else if(k==='sc.note')scene().note=v;else if(k==='sc.dur')scene().dur=clamp(num(v,1.2),0,20);
+ else if(k.startsWith('m.')){const m=markOf(sel),f=k.slice(2);if(f==='size'){const n=num(v,null);if(n!==null)m.size=clamp(n,5,300)}else m[f]=v}
+ else if(k==='px'||k==='py'||k==='pr'){const p=posRef(sel);const n=num(v,null);if(n!==null){if(k==='pr')p.r=Math.round(((n%360)+540)%360-180);else p[k[1]]=+n.toFixed(3)}}
+ else{const it=item(sel);if(k==='kuroko'){it.kuroko=!!v;if(v)it.color=BLACK;else if(it.color===BLACK)it.color=ACOL[0]}else if(['h','w','d','elev'].includes(k)){const n=num(v,null);if(n!==null)it[k]=Math.max(k==='elev'?-500:1,Math.round(n*10)/10)}else it[k]=v}}
+/* ---------- 数値：打ち込み＋ドラッグ（左右に引っぱる） ---------- */
+// 入力欄か左の名前を左右にドラッグすると値が変わる。Shiftで10倍、Altで1/10。クリックだけなら打ち込み。
+function fmtN(v,dec){return dec?(+v).toFixed(dec):String(Math.round(v))}
+function scrub(inp,o){
+ inp.classList.add('scrub');const lab=inp.closest('.row')&&inp.closest('.row').querySelector('label');
+ const start=(e,isLab)=>{
+  if(e.button!==0&&e.pointerType==='mouse')return;if(!isLab&&document.activeElement===inp)return;
+  if(e.pointerType==='mouse')e.preventDefault();
+  const x0=e.clientX,id=e.pointerId;let on=false,v0=0,s0=null;
+  const mv=ev=>{if(ev.pointerId!==id)return;const dx=ev.clientX-x0;
+   if(!on){if(Math.abs(dx)<4)return;on=true;v0=num(inp.value,0);s0=snap();inp.blur();document.body.classList.add('scrubbing')}
+   ev.preventDefault();const f=ev.shiftKey?10:ev.altKey?0.1:1,st=o.step*(ev.altKey?0.1:1);let v=Math.round((v0+dx*o.step*f/ (o.px||1))/st)*st;v=clamp(v,o.min??-1e9,o.max??1e9);
+   inp.value=fmtN(v,ev.altKey?(o.dec||0)+1:o.dec);o.live(v)};
+  const up=ev=>{if(ev.pointerId!==id)return;removeEventListener('pointermove',mv);removeEventListener('pointerup',up);removeEventListener('pointercancel',up);document.body.classList.remove('scrubbing');
+   if(on){pushUndo(s0);o.end()}else if(e.pointerType==='mouse'||isLab){inp.focus();inp.select()}};
+  addEventListener('pointermove',mv,{passive:false});addEventListener('pointerup',up);addEventListener('pointercancel',up)};
+ inp.addEventListener('pointerdown',e=>start(e,false));
+ if(lab){lab.classList.add('scrubL');lab.title='左右にドラッグで数値を変えられます';lab.addEventListener('pointerdown',e=>start(e,true))}}
+const SCRUB={px:[.01,2],py:[.01,2],pr:[1,0,-720,720],h:[1,0,1,400],w:[1,0,1,2000],d:[1,0,1,2000],elev:[1,0,-500,1000],'sc.dur':[.1,1,0,20],'m.size':[1,0,5,300]};
 function liveProps(){const p=sel&&posRef(sel);if(!p)return;const pn=$('#posNow');if(pn)pn.textContent=posLabel(p.x);for(const [k,v] of [['px',f2(p.x)],['py',f2(p.y)],['pr',p.r]]){const i=$(`#props [data-k="${k}"]`);if(i&&document.activeElement!==i)i.value=v}}
 
 /* ---------- シーン（スライド） ---------- */
@@ -699,6 +724,8 @@ function openTheater(){const T=doc.theater;$('#tName').value=T.name;$('#tW').val
 $('#bTheater').onclick=openTheater;$('#tClose').onclick=()=>{$('#mTheater').classList.remove('show');fitMain()};
 $('#mTheater').addEventListener('pointerdown',e=>{if(e.target.id==='mTheater'){$('#mTheater').classList.remove('show');fitMain()}});
 const tSet=(k,fn)=>{const el=$(k);el.onchange=()=>{change(()=>fn(el.value));openTheater();fitMain()};el.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing)el.blur()}};
+for(const [id,fn,dec,mn,mx] of [['#tW',v=>doc.theater.width=v,2,1,200],['#tD',v=>doc.theater.depth=v,2,1,200],['#tH',v=>doc.theater.height=v,2,1,100],['#tWing',v=>doc.theater.wing=v,2,0,50],['#tSH',v=>doc.theater.stageH=v,2,0,5]])
+ scrub($(id),{step:.05,dec:dec,min:mn,max:mx,live:v=>{fn(+v.toFixed(3));draw()},end:()=>{save();renderAll();fitMain()}});
 tSet('#tName',v=>doc.theater.name=v||'劇場');tSet('#tW',v=>doc.theater.width=clamp(num(v,doc.theater.width),1,200));tSet('#tD',v=>doc.theater.depth=clamp(num(v,doc.theater.depth),1,200));
 tSet('#tH',v=>doc.theater.height=clamp(num(v,doc.theater.height),1,100));tSet('#tSH',v=>doc.theater.stageH=clamp(num(v,0.9),0,5));tSet('#tWing',v=>doc.theater.wing=clamp(num(v,doc.theater.wing),0,50));
 $('#tTsura').onchange=()=>{change(()=>doc.theater.tsura=+$('#tTsura').value)};$('#tTsuraBack').onchange=()=>{change(()=>doc.theater.tsuraBack=$('#tTsuraBack').checked)};
@@ -944,7 +971,7 @@ function draw3d(){
  camStep();
  const r=cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1),W=Math.round(r.width*dpr),H=Math.round(r.height*dpr);
  if(glc.width!==W||glc.height!==H){glc.width=W;glc.height=H}
- if(cv.width!==Math.round(r.width*(window.devicePixelRatio||1))){cv.width=Math.round(r.width*(window.devicePixelRatio||1));cv.height=Math.round(r.height*(window.devicePixelRatio||1))}
+ if(cv.width!==Math.round(r.width*(window.devicePixelRatio||1))||cv.height!==Math.round(r.height*(window.devicePixelRatio||1))){cv.width=Math.round(r.width*(window.devicePixelRatio||1));cv.height=Math.round(r.height*(window.devicePixelRatio||1))}
  gl.viewport(0,0,W,H);gl.clearColor(.043,.047,.07,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
  const T=doc.theater,sh=T.stageH??0.9,eye=camEye(),VP=M4.mul(M4.persp(cam.fov,W/H,0.05,400),M4.look(eye,[cam.tx,cam.ty,cam.tz],[0,1,0]));G3.VP=VP;G3.eye=eye;
  gl.uniformMatrix4fv(G3.u.VP,false,VP);gl.disable(gl.BLEND);gl.depthMask(true);
