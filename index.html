@@ -125,6 +125,7 @@ body.pres #present,body.pres #pexit{display:block}
  <button id="bTheater" title="劇場の大きさ・図面">劇場</button>
  <div class="seg"><button data-mode="both" class="on">両方</button><button data-mode="plan">平面</button><button data-mode="front">正面</button><button data-mode="3d">3D</button></div>
  <div class="seg hideM"><button id="tMove" class="on" title="動かす">動かす</button><button id="tMeasure" title="平面図の上でドラッグして距離を測る">測る</button></div>
+ <button id="tMulti" title="押すと、タップで何個でも選べます（PCはShiftを押しながら）">複数</button>
  <button id="bUndo" title="元に戻す (⌘Z)">↶</button><button id="bRedo" title="やり直す (⇧⌘Z)">↷</button>
  <div class="sp"></div>
  <span id="stat"><i></i><span>保存済み</span></span>
@@ -151,7 +152,6 @@ body.pres #present,body.pres #pexit{display:block}
 <aside id="right"><div id="props"></div></aside>
 <footer>
  <div class="fbtn"><button id="scAdd">＋ シーン</button><button id="scDel" class="warn">シーン削除</button></div>
- <div class="fbtn"><button id="scL" title="前へ移動">◀ 移動</button><button id="scR" title="後ろへ移動">移動 ▶</button></div>
  <div id="thumbs" style="display:flex;gap:6px"></div>
 </footer>
 </div>
@@ -231,7 +231,7 @@ body.pres #present,body.pres #pexit{display:block}
 
 <script>
 'use strict';
-const VER='1.5.0';
+const VER='1.6.0';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -251,7 +251,7 @@ const f2=v=>(Math.round(v*100)/100).toFixed(2);
 /* ---------- データ ---------- */
 const PRESETS=[
  ['平台 3×6尺',182,91,40,'#9a8466',1],['平台 4×8尺',242,121,40,'#9a8466',1],['箱馬',36,21,18,'#8a7458',1],
- ['階段 3段',91,90,60,'#8d7a60',1],['椅子',45,45,85,'#b5835a',0],['テーブル',120,75,72,'#a0764f',0],
+ ['階段 3段',91,90,60,'#8d7a60',1],['パイプ椅子',45,47,78,'#4a5060',0,'chair'],['パイプ椅子 5脚（横1列）',250,47,78,'#4a5060',0,'chairrow'],['テーブル',120,75,72,'#a0764f',0],
  ['ソファ',180,85,80,'#6f7fa8',0],['ベッド',200,100,50,'#7f8fb0',1],['パネル 3×9尺',91,8,273,'#77808f',0],['パネル 6×9尺',182,8,273,'#77808f',0],
  ['ドア枠',100,15,210,'#8f7c6a',0],['マイクスタンド',30,30,150,'#555c6a',0],['箱 45cm',45,45,45,'#a08a60',1],['自由な大きさ',100,100,100,'#888fa0',0]];
 // 吊りもの・幕：[名前, 種類, 色, 紗, 中割]  大きさは劇場に合わせて決める
@@ -272,7 +272,7 @@ function newDoc(){
  const a={id:uid(),type:'actor',name:'役者A',color:ACOL[0],h:170,w:45,d:28,elev:0};
  const b={id:uid(),type:'actor',name:'役者B',color:ACOL[1],h:158,w:42,d:26,elev:0};
  const p={id:uid(),type:'object',name:'平台',color:'#9a8466',w:182,d:91,h:40,elev:0,shape:'rect',stand:true};
- const c={id:uid(),type:'object',name:'椅子',color:'#b5835a',w:45,d:45,h:85,elev:0,shape:'rect',stand:false};
+ const c={id:uid(),type:'object',name:'パイプ椅子',color:'#4a5060',w:45,d:47,h:78,elev:0,shape:'chair',stand:false};
  return {v:1,marks:[],theater:{name:'劇場',width:10,depth:8,height:6,wing:3,grid:1,outline:null,ul:null,tsura:1,tsuraBack:false,don:{on:true,color:'#7a1622'}},
   items:[a,b,p,c],
   scenes:[{id:uid(),title:'シーン1',note:'',dur:1.2,pos:{[a.id]:{x:-1.5,y:2,r:0,on:true},[b.id]:{x:1.2,y:2.5,r:-20,on:true},[p.id]:{x:0,y:5,r:0,on:true},[c.id]:{x:2.5,y:4,r:30,on:true}}}],
@@ -289,6 +289,14 @@ const markOf=id=>(doc.marks||[]).find(m=>m.id===id);
 function posRef(id){return markOf(id)||scene().pos[id]}
 function fixDoc(d){d.marks=d.marks||[];const T=d.theater;if(!T.don)T.don={on:true,color:'#7a1622'};if(T.tsura===undefined)T.tsura=1;if(T.tsuraBack===undefined)T.tsuraBack=false;return d}
 let showMarks=true;
+let selSet=new Set(),multiMode=false;
+function isMulti(){return selSet.size>1&&sel&&selSet.has(sel)}
+function selIds(){return isMulti()?[...selSet]:sel?[sel]:[]}
+function isS(id){return sel===id||(isMulti()&&selSet.has(id))}
+const oS=(o,id)=>o.sel!=null&&o.ui!==false&&isS(id);
+function selectOne(id){sel=id;selSet=new Set(id?[id]:[])}
+function toggleSel(id){const cur=new Set(selIds());if(cur.has(id)){cur.delete(id);selSet=cur;sel=cur.size?[...cur][cur.size-1]:null}else{cur.add(id);selSet=cur;sel=id}}
+function clearSel(){sel=null;selSet=new Set()}
 const MCOL=['#ff4d4d','#ffd23f','#3ecf8e','#4ea1ff','#ff8ad8','#ffffff','#ff9a3c','#b07cff'];
 function tsuraNo(x){const st=doc.theater.tsura;if(!st)return null;return Math.round(Math.abs(x)/st*10)/10}
 function posLabel(x){if(Math.abs(x)<0.005)return 'センター';const t=tsuraNo(x);return (x>0?'上手 ':'下手 ')+f2(Math.abs(x))+'m'+(t!==null?'（'+t+'番）':'')}
@@ -355,6 +363,8 @@ function inFoot(o,p,x,y){const dx=x-p.x,dy=y-p.y,a=p.r*Math.PI/180;const lx=dx*M
  return Math.abs(lx)<=o.w/200&&Math.abs(ly)<=o.d/200}
 function baseZ(it,p,sc){let z=(it.elev||0)/100;if(it.type!=='actor')return z;
  for(const o of doc.items){if(o.type!=='object'||!o.stand)continue;const q=posOf(o.id,sc);if(!q||q.a<.5)continue;if(inFoot(o,q,p.x,p.y))z=Math.max(z,((o.elev||0)+o.h)/100)}return z}
+const isChair=it=>it.shape==='chair'||it.shape==='chairrow';
+function chairXs(it){const n=it.shape==='chairrow'?Math.max(1,Math.round(it.w/50)):1,cw=it.w/100/n;return {n,cw,xs:Array.from({length:n},(_,i)=>-it.w/200+cw*(i+0.5))}}
 const projW=(it,r)=>{const a=r*Math.PI/180;return Math.abs(it.w*Math.cos(a))+Math.abs(it.d*Math.sin(a))};
 
 /* ---------- 描画 ---------- */
@@ -367,6 +377,7 @@ function draw(){
  if(cv.width!==Math.round(r.width*dpr)||cv.height!==Math.round(r.height*dpr)){cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr)}
  ctx.setTransform(dpr,0,0,dpr,0,0);
  renderTo(ctx,r.width,r.height,V,mode,{sel,ui:true});
+ if(drag&&drag.t==='band'){ctx.save();ctx.strokeStyle='#4ea1ff';ctx.fillStyle='rgba(78,161,255,.12)';ctx.setLineDash([5,4]);ctx.lineWidth=1.5;const bx=Math.min(drag.x0,drag.x1),by=Math.min(drag.y0,drag.y1),bw=Math.abs(drag.x1-drag.x0),bh=Math.abs(drag.y1-drag.y0);ctx.fillRect(bx,by,bw,bh);ctx.strokeRect(bx,by,bw,bh);ctx.restore()}
  drawHud()}
 function drawHud(){const sc=scene();$('#hud').textContent=mode==='3d'?`${doc.cur+1}/${doc.scenes.length}  ${sc.title}　｜　ドラッグで回す・Shift/右ドラッグで平行移動・ホイール/ピンチで寄る　｜　人や物はドラッグで動かせます`:`${doc.cur+1}/${doc.scenes.length}  ${sc.title}　｜　1マス ${gridLabel()}　｜　ドラッグで移動・ホイール/ピンチで拡大`;
  if(document.body.classList.contains('pres')){$('#present .tt').textContent=sc.title;$('#present .nt').textContent=sc.note||'';$('#present .pg').textContent=(doc.cur+1)+' / '+doc.scenes.length}
@@ -425,20 +436,20 @@ function drawPlan(c,w,h,vw,sc,o){
  if(T.don&&T.don.on){const dn=donAt(sc),[a1,b1]=P(-hw-0.3,0.3),[a2]=P(hw+0.3,0.3);c.strokeStyle=hexA(T.don.color,dn>0.02?1:.45);c.lineWidth=dn>0.02?4:2;c.setLineDash(dn>0.02?[]:[8,5]);c.beginPath();c.moveTo(a1,b1);c.lineTo(a2,b1);c.stroke();c.setLineDash([]);
   if(o.ui!==false){c.font='600 10px sans-serif';c.fillStyle='#e08890';c.textAlign='left';c.textBaseline='bottom';c.fillText('緞帳 '+(dn<0.02?'上':dn>0.98?'下':Math.round(dn*100)+'%'),a2+4,b1+5)}}
  // バミリ
- for(const m of allMarks())drawMarkPlan(c,vw,m,o.sel===m.id&&o.ui!==false);
+ for(const m of allMarks())drawMarkPlan(c,vw,m,oS(o,m.id));
  // もの
  const its=doc.items.map(it=>({it,p:posOf(it.id,sc)})).filter(e=>e.p);
  its.sort((a,b2)=>(a.it.type==='actor')-(b2.it.type==='actor')||((a.p.elev||0)-(b2.p.elev||0)));
- for(const {it,p} of its)drawItemPlan(c,vw,it,p,o.sel===it.id,o);
+ for(const {it,p} of its)drawItemPlan(c,vw,it,p,oS(o,it.id),o);
  // 選択中の寸法
- const sp=o.sel&&its.find(e=>e.it.id===o.sel);
+ const sp=o.sel&&!isMulti()&&its.find(e=>e.it.id===o.sel);
  if(sp&&o.ui!==false){const p=sp.p,[a,bb]=P(p.x,p.y),[za]=P(0,p.y),[,zb]=P(p.x,0);
   c.setLineDash([3,3]);c.strokeStyle='#4ea1ff';c.lineWidth=1;c.beginPath();c.moveTo(a,bb);c.lineTo(za,bb);c.moveTo(a,bb);c.lineTo(a,zb);c.stroke();c.setLineDash([]);
   c.font='600 11px sans-serif';c.fillStyle='#4ea1ff';c.textAlign='center';c.textBaseline='bottom';
   const lx=posLabel(p.x);
   if(Math.abs(p.x)>=0.005)tag(c,lx,(a+za)/2,bb-4);else{c.textAlign='center';tag(c,lx,a,bb-14)}
   c.textAlign='left';c.textBaseline='middle';tag(c,'ツラから '+f2(p.y)+'m',a+6,(bb+zb)/2)}
- const sm=o.sel&&o.ui!==false&&showMarks&&markOf(o.sel);
+ const sm=o.sel&&!isMulti()&&o.ui!==false&&showMarks&&markOf(o.sel);
  if(sm){const [a,bb]=P(sm.x,sm.y),[za]=P(0,sm.y),[,zb]=P(sm.x,0);c.setLineDash([3,3]);c.strokeStyle='#4ea1ff';c.lineWidth=1;c.beginPath();c.moveTo(a,bb);c.lineTo(za,bb);c.moveTo(a,bb);c.lineTo(a,zb);c.stroke();c.setLineDash([]);
   c.font='600 11px sans-serif';c.fillStyle='#4ea1ff';c.textAlign='center';c.textBaseline='bottom';tag(c,posLabel(sm.x),Math.abs(sm.x)<0.005?a:(a+za)/2,bb-14);c.textAlign='left';c.textBaseline='middle';tag(c,'ツラから '+f2(sm.y)+'m',a+6,(bb+zb)/2)}
  // 測定
@@ -458,15 +469,19 @@ function drawItemPlan(c,vw,it,p,isSel,o){
   c.beginPath();c.moveTo(-W*0.18,D/2-1);c.lineTo(0,D/2+Math.max(5,D*0.45));c.lineTo(W*0.18,D/2-1);c.fillStyle=kc?'#7a7f8c':it.color;c.fill();
   if(!kc){c.beginPath();c.arc(0,0,Math.min(W,D)*0.28,0,7);c.fillStyle='rgba(255,255,255,.35)';c.fill()}
  }else if(it.drape){
-  const Dp=Math.max(D,3);for(const [cx,vw2] of drapePanels(it,p.open)){const x0=(cx-vw2/2)*k,x1=(cx+vw2/2)*k;c.fillStyle=hexA(it.color==='#16161b'||it.color==='#101014'?'#3a3d4a':it.color,it.sheer?.35:.85);c.fillRect(x0,-Dp/2,x1-x0,Dp);
-   c.strokeStyle=isSel?'#fff':it.sheer?'rgba(220,225,235,.7)':'rgba(170,175,190,.8)';c.lineWidth=isSel?2:1;c.beginPath();for(let x=x0;x<=x1;x+=4){const yy=Math.sin((x-x0)/3)*Math.max(1.5,Dp/2);x===x0?c.moveTo(x,yy):c.lineTo(x,yy)}c.stroke()}
+  for(const [cx,vw2] of drapePanels(it,p.open)){const x0=(cx-vw2/2)*k,x1=(cx+vw2/2)*k,wv=drapeWave(it,vw2),lp=Math.max(6,wv.lam*k),ap=Math.max(2.2,wv.amp*k);
+   const path=()=>{c.beginPath();for(let x=x0;x<=x1+0.1;x+=Math.max(1,lp/12)){const yy=Math.sin((x-x0)/lp*2*Math.PI)*ap;x===x0?c.moveTo(x,yy):c.lineTo(x,yy)}};
+   c.lineCap='round';path();c.strokeStyle=isSel?'#fff':'rgba(200,205,215,.55)';c.lineWidth=Math.max(3.5,0.045*k)+2;c.stroke();path();c.strokeStyle=hexA(it.color,it.sheer?.6:1);c.lineWidth=Math.max(3.5,0.045*k);c.stroke()}
+ }else if(isChair(it)){
+  const {cw,xs}=chairXs(it);for(const x of xs){const X=x*k,cwp=cw*k*0.9;rr(c,X-cwp/2,-D/2+D*0.12,cwp,D*0.85,Math.min(3,cwp*0.15));c.fillStyle=hexA(it.color,.9);c.fill();c.lineWidth=isSel?2:1;c.strokeStyle=isSel?'#fff':'#9aa0aa';c.stroke();
+   c.strokeStyle='#c0c5ce';c.lineWidth=Math.max(2,0.03*k);c.beginPath();c.moveTo(X-cwp/2,-D/2+1);c.lineTo(X+cwp/2,-D/2+1);c.stroke()}
  }else{
   if(it.shape==='ellipse'){c.beginPath();c.ellipse(0,0,W/2,D/2,0,0,7)}else rr(c,-W/2,-D/2,W,D,2);
   c.fillStyle=hexA(it.color,.75);c.fill();c.lineWidth=isSel?2.5:1;c.strokeStyle=isSel?'#fff':'rgba(0,0,0,.6)';c.stroke();
   // 正面（客席側）を示す線
   c.strokeStyle='rgba(255,255,255,.45)';c.lineWidth=2;c.beginPath();c.moveTo(-W/2+2,D/2-2);c.lineTo(W/2-2,D/2-2);c.stroke();
  }
- if(isSel&&o.ui!==false){const hy=Math.max(D/2,8)+(it.type==='actor'?Math.max(5,D*.45):0)+16;c.strokeStyle='#4ea1ff';c.lineWidth=1.5;c.beginPath();c.moveTo(0,D/2);c.lineTo(0,hy);c.stroke();c.beginPath();c.arc(0,hy,6,0,7);c.fillStyle='#4ea1ff';c.fill()}
+ if(isSel&&o.ui!==false&&!isMulti()){const hy=Math.max(D/2,8)+(it.type==='actor'?Math.max(5,D*.45):0)+16;c.strokeStyle='#4ea1ff';c.lineWidth=1.5;c.beginPath();c.moveTo(0,D/2);c.lineTo(0,hy);c.stroke();c.beginPath();c.arc(0,hy,6,0,7);c.fillStyle='#4ea1ff';c.fill()}
  c.restore();
  c.save();c.globalAlpha=p.a;c.font=(it.type==='actor'?'700 ':'')+'11px sans-serif';c.textAlign='center';c.textBaseline='bottom';c.fillStyle='#fff';
  const ty=sy-Math.max(W,D)/2-3;c.shadowColor='#000';c.shadowBlur=3;c.fillText(it.name,sx,ty);c.restore();
@@ -485,11 +500,19 @@ function hesoMark(){const b=stageBounds();return {id:'__heso',label:'ヘソ',col
 function allMarks(){return [hesoMark(),...(showMarks?(doc.marks||[]):[])]}
 function markArms(m){if(m.shape==='X'){const L=(m.size||30)/100;return [[0,0,L,0.05,45],[0,0,L,0.05,-45]]}const L=(m.size||30)/100,t=0.05,h=L/2;// [中心x,中心y,幅,奥行]（ローカル、y+=客席側）
  switch(m.shape){case 'T':return [[0,-h+t/2,L,t],[0,0,t,L]];case 'L':return [[-h+t/2,0,t,L],[0,h-t/2,L,t]];case 'line':return [[0,0,L,t]];case 'dot':return [[0,0,0.08,0.08]];default:return [[0,0,L,t],[0,0,t,L]]}}
-function drawMarkPlan(c,vw,m,isSel){const k=vw.k,[sx,sy]=pS(vw,m.x,m.y);c.save();c.translate(sx,sy);c.rotate((m.r||0)*Math.PI/180);c.fillStyle=m.color;
- for(const [x,y,w,d,a] of markArms(m)){const W=Math.max(w*k,w===0.05?2:3),D=Math.max(d*k,d===0.05?2:3);c.save();c.translate(x*k,y*k);if(a)c.rotate(a*Math.PI/180);c.fillRect(-W/2,-D/2,W,D);c.restore()}
- if(isSel){const r=Math.max((m.size||30)/200*k,7)+5;c.strokeStyle='#4ea1ff';c.lineWidth=1.5;c.setLineDash([3,3]);c.beginPath();c.arc(0,0,r,0,7);c.stroke();c.setLineDash([])}
- c.restore();if(m.label){c.save();c.font='700 10px sans-serif';c.textAlign='left';c.textBaseline='bottom';c.fillStyle=m.color;c.shadowColor='#000';c.shadowBlur=3;c.fillText(m.label,sx+Math.max((m.size||30)/200*k,5)+2,sy-2);c.restore()}}
-function hitMark(sx,sy){if(!showMarks||regionAt(sy)!=='plan')return null;let best=null,bd=1e9;for(const m of doc.marks||[]){const [x,y]=pS(V,m.x,m.y),d=Math.hypot(sx-x,sy-y),r=Math.max((m.size||30)/200*V.k,TOUCH?20:10);if(d<=r&&d<bd){bd=d;best=m}}return best}
+// バミリ：縮小しても最低の大きさで見えるようにする（実寸より小さくは描かない）
+function markPx(m,k){const L=(m.size||30)/100*k;return Math.max(L,m.fixed?20:16)}
+function drawMarkPlan(c,vw,m,isSel){const k=vw.k,[sx,sy]=pS(vw,m.x,m.y),Lp=markPx(m,k),f=Lp/((m.size||30)/100*k),tw=Math.max(2.5,0.05*k);
+ c.save();c.translate(sx,sy);c.rotate((m.r||0)*Math.PI/180);
+ const arms=markArms(m),drawArms=(col,ex)=>{c.fillStyle=col;for(const [x,y,w,d,a] of arms){const W=(w<=0.051?tw:w*k*f)+ex,D=(d<=0.051?tw:d*k*f)+ex;c.save();c.translate(x*k*f,y*k*f);if(a)c.rotate(a*Math.PI/180);c.fillRect(-W/2,-D/2,W,D);c.restore()}};
+ drawArms('rgba(0,0,0,.6)',2);drawArms(m.color,0);
+ if(isSel){const r=Lp/2+6;c.strokeStyle='#4ea1ff';c.lineWidth=1.5;c.setLineDash([3,3]);c.beginPath();c.arc(0,0,r,0,7);c.stroke();c.setLineDash([])}
+ c.restore();if(m.label)markLabel(c,m,sx+Lp/2+3,sy-3)}
+// 名前ラベル。番号だけのバミリは四角で囲む
+function markLabel(c,m,x,y){c.save();c.font='700 11px sans-serif';const num=/^\d+$/.test(String(m.label).trim()),tw=c.measureText(m.label).width;
+ if(num){const sz=Math.max(16,tw+8);c.fillStyle='rgba(14,16,22,.9)';c.fillRect(x,y-sz,sz,sz);c.strokeStyle=m.color;c.lineWidth=1.8;c.strokeRect(x+0.9,y-sz+0.9,sz-1.8,sz-1.8);c.fillStyle=m.color;c.textAlign='center';c.textBaseline='middle';c.fillText(m.label,x+sz/2,y-sz/2+0.5)}
+ else{c.textAlign='left';c.textBaseline='bottom';c.fillStyle=m.color;c.shadowColor='#000';c.shadowBlur=3;c.fillText(m.label,x,y)}c.restore()}
+function hitMark(sx,sy){if(!showMarks||regionAt(sy)!=='plan')return null;let best=null,bd=1e9;for(const m of doc.marks||[]){const [x,y]=pS(V,m.x,m.y),d=Math.hypot(sx-x,sy-y),r=Math.max(markPx(m,V.k)/2+4,TOUCH?20:10);if(d<=r&&d<bd){bd=d;best=m}}return best}
 function hexA(h,a){const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}
 
 function drawFront(c,w,h,vw,sc,o){
@@ -517,26 +540,31 @@ function drawFront(c,w,h,vw,sc,o){
  // もの（奥から順に）
  const its=doc.items.map(it=>({it,p:posOf(it.id,sc)})).filter(e=>e.p).sort((x,y)=>y.p.y-x.p.y||(x.it.type==='actor')-(y.it.type==='actor'));
  let donDone=false;const drawDon=()=>{donDone=true;if(!(T.don&&T.don.on))return;const dn=donAt(sc);if(dn<0.01)return;const top=T.height,bot=T.height*(1-dn),[x0,y0]=F(-hw-0.2,top),[x1,y1]=F(hw+0.2,bot);
-  c.fillStyle=T.don.color;c.fillRect(x0,y0,x1-x0,y1-y0);c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1;c.beginPath();for(let x=-hw;x<hw;x+=0.35){const [fx]=F(x,0);c.moveTo(fx,y0);c.lineTo(fx,y1)}c.stroke();
+  {const lp=Math.max(5,0.36*k),st=Math.max(1,lp/8);for(let x=x0;x<x1;x+=st){const b=0.6+0.4*(0.5+0.5*Math.cos((x-x0)/lp*2*Math.PI));c.fillStyle=shade(T.don.color,b);c.fillRect(x,y0,Math.min(st+0.6,x1-x),y1-y0)}}
   c.fillStyle='#c9a24a';c.fillRect(x0,y1-Math.max(2,0.08*k),x1-x0,Math.max(2,0.08*k));c.font='700 12px sans-serif';c.fillStyle='rgba(255,255,255,.55)';c.textAlign='center';c.textBaseline='middle';if(y1-y0>20)c.fillText('緞帳',(x0+x1)/2,(y0+y1)/2)};
  for(const {it,p} of its){const z0=baseZ(it,p,sc);if(!donDone&&p.y<0.3)drawDon();
   // 奥ほど少し暗く（大きさは変えない＝実寸のまま）
   const dim=clamp(1-p.y/Math.max(T.depth,1)*0.35,0.6,1);
-  if(it.type==='actor')drawPerson(c,vw,it,p,z0,dim,o.sel===it.id);
+  if(it.type==='actor')drawPerson(c,vw,it,p,z0,dim,oS(o,it.id));
   else if(it.drape){const cr=Math.cos(p.r*Math.PI/180);c.save();c.globalAlpha=p.a*(it.sheer?.38:1);
-   for(const [cx,w2] of drapePanels(it,p.open)){const xa=p.x+(cx-w2/2)*cr,xb=p.x+(cx+w2/2)*cr,[x0,y0]=F(Math.min(xa,xb),z0+it.h/100),[x1,y1]=F(Math.max(xa,xb),z0);c.fillStyle=shade(it.color,dim);c.fillRect(x0,y0,x1-x0,y1-y0);
-    c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1;c.beginPath();for(let x=x0+0.25*k;x<x1;x+=Math.max(3,0.25*k)){c.moveTo(x,y0);c.lineTo(x,y1)}c.stroke();if(o.sel===it.id){c.strokeStyle='#fff';c.lineWidth=2;c.strokeRect(x0,y0,x1-x0,y1-y0)}}
+   for(const [cx,w2] of drapePanels(it,p.open)){const xa=p.x+(cx-w2/2)*cr,xb=p.x+(cx+w2/2)*cr,[x0,y0]=F(Math.min(xa,xb),z0+it.h/100),[x1,y1]=F(Math.max(xa,xb),z0);const wv=drapeWave(it,w2),lp=Math.max(5,wv.lam*k),st=Math.max(1,lp/8);for(let x=x0;x<x1;x+=st){const b=0.62+0.38*(0.5+0.5*Math.cos((x-x0)/lp*2*Math.PI));c.fillStyle=shade(lighten(it.color),dim*b);c.fillRect(x,y0,Math.min(st+0.6,x1-x),y1-y0)}if(oS(o,it.id)){c.strokeStyle='#fff';c.lineWidth=2;c.strokeRect(x0,y0,x1-x0,y1-y0)}}
    c.globalAlpha=p.a;c.font='11px sans-serif';c.textAlign='center';c.textBaseline='bottom';c.fillStyle='#fff';c.shadowColor='#000';c.shadowBlur=3;const [lx,ly]=F(p.x,z0+it.h/100);c.fillText(it.name,lx,ly-2);c.restore()}
+  else if(isChair(it)){const {n,cw}=chairXs(it),cr=Math.abs(Math.cos(p.r*Math.PI/180)),pw=projW(it,p.r)/100,H=it.h/100,sel2=oS(o,it.id);c.save();c.globalAlpha=p.a;
+   for(let i=0;i<n;i++){const cx=p.x-pw/2+pw/n*(i+0.5),hw2=Math.max(0.12,pw/n*0.43),[a0,b0]=F(cx-hw2,z0),[a1]=F(cx+hw2,z0),[,bs]=F(cx,z0+H*0.55),[,bt]=F(cx,z0+H),[,bb]=F(cx,z0+H*0.68);
+    c.strokeStyle=shade('#9aa0aa',dim);c.lineWidth=Math.max(1,0.022*k);c.beginPath();c.moveTo(a0+1,b0);c.lineTo(a0+1,bt);c.moveTo(a1-1,b0);c.lineTo(a1-1,bt);c.stroke();
+    c.fillStyle=shade(it.color,dim);c.fillRect(a0,bs-Math.max(2,0.035*k),a1-a0,Math.max(2,0.035*k));if(cr>0.3)c.fillRect(a0+1,bt,a1-a0-2,bb-bt);if(sel2){c.strokeStyle='#fff';c.lineWidth=1.5;c.strokeRect(a0-2,bt-2,a1-a0+4,b0-bt+4)}}
+   c.font='11px sans-serif';c.textAlign='center';c.textBaseline='bottom';c.fillStyle='#fff';c.shadowColor='#000';c.shadowBlur=3;const [lx,ly]=F(p.x,z0+H);c.fillText(it.name,lx,ly-2);c.restore()}
   else{const pw=projW(it,p.r)/100,[x0,y0]=F(p.x-pw/2,z0+it.h/100),[x1,y1]=F(p.x+pw/2,z0);c.save();c.globalAlpha=p.a;
-   if(it.shape==='ellipse'&&false){}rr(c,x0,y0,x1-x0,y1-y0,2);c.fillStyle=shade(it.color,dim);c.fill();c.lineWidth=o.sel===it.id?2.5:1;c.strokeStyle=o.sel===it.id?'#fff':'rgba(0,0,0,.6)';c.stroke();
+   if(it.shape==='ellipse'&&false){}rr(c,x0,y0,x1-x0,y1-y0,2);c.fillStyle=shade(it.color,dim);c.fill();c.lineWidth=oS(o,it.id)?2.5:1;c.strokeStyle=oS(o,it.id)?'#fff':'rgba(0,0,0,.6)';c.stroke();
    c.font='11px sans-serif';c.textAlign='center';c.textBaseline='bottom';c.fillStyle='#fff';c.shadowColor='#000';c.shadowBlur=3;c.fillText(it.name,(x0+x1)/2,y0-2);c.restore()}}
  if(!donDone)drawDon();
  // 選択中の高さ
- const s=o.sel&&its.find(e=>e.it.id===o.sel);
+ const s=o.sel&&!isMulti()&&its.find(e=>e.it.id===o.sel);
  if(s&&o.ui!==false){const z0=baseZ(s.it,s.p,sc),top=z0+s.it.h/100,[x,y]=F(s.p.x,top),[,y0]=F(s.p.x,0),pw=(s.it.type==='actor'?s.it.w:projW(s.it,s.p.r))/100,[xr]=F(s.p.x+pw/2+0.12,0);
   c.strokeStyle='#4ea1ff';c.lineWidth=1;c.beginPath();c.moveTo(xr-4,y);c.lineTo(xr+4,y);c.moveTo(xr,y);c.lineTo(xr,y0);c.moveTo(xr-4,y0);c.lineTo(xr+4,y0);c.stroke();
   c.fillStyle='#4ea1ff';c.font='600 11px sans-serif';c.textAlign='left';c.textBaseline='middle';tag(c,f2(top)+'m'+(z0>0.001?'（床から）':''),xr+6,(y+y0)/2)}
 }
+function lighten(h){const n=parseInt(h.slice(1),16),r=n>>16&255,g=n>>8&255,b=n&255,mx=Math.max(r,g,b);if(mx>=60)return h;const a=60-mx;return '#'+[r+a,g+a,b+a].map(v=>Math.min(255,v).toString(16).padStart(2,'0')).join('')}
 function shade(h,f){const n=parseInt(h.slice(1),16);return `rgb(${(n>>16&255)*f|0},${(n>>8&255)*f|0},${(n&255)*f|0})`}
 function drawPerson(c,vw,it,p,z0,dim,isSel){
  const H=it.h/100,fw=clamp(projW(it,p.r)/it.w,0.55,1),Wm=it.w/100*fw,F=(x,z)=>fS(vw,x,z),k=vw.k;
@@ -585,16 +613,20 @@ cv.addEventListener('pointerdown',e=>{
  if(mode==='3d'){down3(e,sx,sy);return}
  if(ptrs.size===2){const [a,b]=[...ptrs.values()];drag={t:'pinch',d0:Math.hypot(a.x-b.x,a.y-b.y),k0:V.k,ox0:V.ox,oy0:V.oy,cx:(a.x+b.x)/2,cy:(a.y+b.y)/2};return}
  if(hitRot(sx,sy)){drag={t:'rot',s0:snap(),moved:false};return}
- const h=hitItem(sx,sy);
- if(h&&tool==='move'){if(sel!==h.it.id){sel=h.it.id;renderProps();renderList()}
-  const p=scene().pos[h.it.id];
-  if(h.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);drag={t:'item',reg:'plan',dx:p.x-wx,dy:p.y-wy,s0:snap(),moved:false}}
+ const add=e.shiftKey||e.metaKey||e.ctrlKey||multiMode;
+ const h=hitItem(sx,sy),hm=!h&&tool==='move'?hitMark(sx,sy):null,hid=h?h.it.id:hm?hm.id:null;
+ if(hid&&tool==='move'){
+  if(add){toggleSel(hid);renderProps();renderList();draw();return}
+  if(isMulti()&&selSet.has(hid)){const reg=h?h.reg:'plan',st={};for(const id of selIds()){const q=posRef(id);if(q)st[id]={x:q.x,y:q.y}}
+   const [wx,wy]=reg==='plan'?Sp(V,sx,sy):[(sx-V.ox)/V.k,0];drag={t:'group',reg,wx,wy,st,s0:snap(),moved:false};return}
+  if(sel!==hid||isMulti()){selectOne(hid);renderProps();renderList()}
+  const p=posRef(hid);
+  if(!h||h.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);drag={t:'item',reg:'plan',dx:p.x-wx,dy:p.y-wy,s0:snap(),moved:false}}
   else{const wx=(sx-V.ox)/V.k;drag={t:'item',reg:'front',dx:p.x-wx,s0:snap(),moved:false}}
   draw();return}
- const hm=!h&&tool==='move'?hitMark(sx,sy):null;
- if(hm){if(sel!==hm.id){sel=hm.id;renderProps();renderList()}const [wx,wy]=Sp(V,sx,sy);drag={t:'item',reg:'plan',dx:hm.x-wx,dy:hm.y-wy,s0:snap(),moved:false};draw();return}
  if(tool==='measure'&&regionAt(sy)==='plan'){const q=Sp(V,sx,sy);measure={a:q,b:q};drag={t:'meas'};draw();return}
- if(sel&&!h){sel=null;renderProps();renderList()}
+ if(add&&tool==='move'&&regionAt(sy)==='plan'){drag={t:'band',x0:sx,y0:sy,x1:sx,y1:sy,add:true};return}
+ if(sel){clearSel();renderProps();renderList()}
  drag={t:'pan',x:sx,y:sy,ox:V.ox,oy:V.oy};draw()});
 cv.addEventListener('pointermove',e=>{
  const r=cv.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,{x:sx,y:sy});
@@ -603,6 +635,9 @@ cv.addEventListener('pointermove',e=>{
  if(drag.t==='pinch'&&ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y),f=d/drag.d0,cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;
   V.k=clamp(drag.k0*f,3,2000);V.ox=cx-(drag.cx-drag.ox0)*V.k/drag.k0;V.oy=cy-(drag.cy-drag.oy0)*V.k/drag.k0;draw();return}
  if(drag.t==='pan'){V.ox=drag.ox+sx-drag.x;V.oy=drag.oy+sy-drag.y;draw();return}
+ if(drag.t==='band'){drag.x1=sx;drag.y1=sy;draw();return}
+ if(drag.t==='group'){let dx,dy=0;if(drag.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);dx=snapv(wx-drag.wx,e.altKey);dy=snapv(wy-drag.wy,e.altKey)}else dx=snapv((sx-V.ox)/V.k-drag.wx,e.altKey);
+  for(const id in drag.st){const q=posRef(id);if(q){q.x=+(drag.st[id].x+dx).toFixed(3);q.y=+(drag.st[id].y+dy).toFixed(3)}}drag.moved=true;draw();return}
  if(drag.t==='meas'){measure.b=Sp(V,sx,sy);if(!e.altKey){measure.b=measure.b.map(v=>snapv(v))}draw();return}
  const p=posRef(sel);if(!p)return;
  if(drag.t==='item'){if(drag.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);p.x=snapv(wx+drag.dx,e.altKey);p.y=snapv(wy+drag.dy,e.altKey)}else{p.x=snapv((sx-V.ox)/V.k+drag.dx,e.altKey)}
@@ -610,7 +645,16 @@ cv.addEventListener('pointermove',e=>{
  if(drag.t==='rot'){const [cx,cy]=pS(V,p.x,p.y);let a=Math.atan2(-(sx-cx),sy-cy)*180/Math.PI;if(!e.altKey)a=Math.round(a/15)*15;p.r=Math.round(((a%360)+540)%360-180);drag.moved=true;draw();liveProps()}
 });
 function endPtr(e){ptrs.delete(e.pointerId);if(mode==='3d'){up3();return}if(!drag)return;if(drag.t==='pinch'){if(ptrs.size<2)drag=null;return}
- if((drag.t==='item'||drag.t==='rot')&&drag.moved){pushUndo(drag.s0);renderThumb(doc.cur);if(markOf(sel))renderList();save()}drag=null}
+ if((drag.t==='item'||drag.t==='rot')&&drag.moved){pushUndo(drag.s0);renderThumb(doc.cur);if(markOf(sel))renderList();save()}
+ if(drag.t==='group'&&drag.moved){pushUndo(drag.s0);renderThumb(doc.cur);renderList();save()}
+ if(drag.t==='band')finishBand(drag);
+ drag=null}
+function finishBand(d){const x0=Math.min(d.x0,d.x1),x1=Math.max(d.x0,d.x1),y0=Math.min(d.y0,d.y1),y1=Math.max(d.y0,d.y1);
+ if(x1-x0<4&&y1-y0<4){draw();return}
+ const [ax,ay]=Sp(V,x0,y1),[bx,by]=Sp(V,x1,y0),inR=(x,y)=>x>=ax&&x<=bx&&y>=ay&&y<=by,ids=new Set(d.add?selIds():[]);
+ for(const it of doc.items){const p=posOf(it.id);if(p&&inR(p.x,p.y))ids.add(it.id)}
+ if(showMarks)for(const m of doc.marks||[])if(inR(m.x,m.y))ids.add(m.id);
+ selSet=ids;sel=ids.size?[...ids][ids.size-1]:null;renderProps();renderList();draw()}
 cv.addEventListener('pointerup',endPtr);cv.addEventListener('pointercancel',endPtr);
 cv.addEventListener('wheel',e=>{e.preventDefault();if(mode==='3d'){camAnim=null;cam.dist=clamp(cam.dist*Math.exp(e.deltaY*(e.ctrlKey?0.01:0.0015)),1,200);draw();return}const r=cv.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
  if(e.ctrlKey||!e.shiftKey&&Math.abs(e.deltaY)>=Math.abs(e.deltaX)&&!(e.deltaMode===0&&Math.abs(e.deltaY)<4&&false)){zoomAt(sx,sy,Math.exp(-e.deltaY*(e.ctrlKey?0.01:0.0015)))}else{V.ox-=e.deltaX;V.oy-=e.deltaY;draw()}},{passive:false});
@@ -627,11 +671,12 @@ document.addEventListener('keydown',e=>{
  if(pres){if(['ArrowRight','ArrowDown',' ','Enter','PageDown'].includes(e.key)){e.preventDefault();if(doc.cur<doc.scenes.length-1)goScene(doc.cur+1,true)}
   else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();goScene(doc.cur-1,false)}else if(e.key==='Escape')endPresent();return}
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
- if(sel&&e.key.startsWith('Arrow')){e.preventDefault();const p=posRef(sel);if(!p)return;const s=e.shiftKey?0.5:0.05;pushUndo();
-  if(e.key==='ArrowLeft')p.x-=s;if(e.key==='ArrowRight')p.x+=s;if(e.key==='ArrowUp')p.y+=s;if(e.key==='ArrowDown')p.y-=s;p.x=+p.x.toFixed(3);p.y=+p.y.toFixed(3);draw();liveProps();renderThumb(doc.cur);save();return}
+ if(sel&&e.key.startsWith('Arrow')){e.preventDefault();const ps=selIds().map(posRef).filter(Boolean);if(!ps.length)return;const s=e.shiftKey?0.5:0.05;pushUndo();
+  for(const p of ps){if(e.key==='ArrowLeft')p.x-=s;if(e.key==='ArrowRight')p.x+=s;if(e.key==='ArrowUp')p.y+=s;if(e.key==='ArrowDown')p.y-=s;p.x=+p.x.toFixed(3);p.y=+p.y.toFixed(3)}draw();liveProps();renderThumb(doc.cur);save();return}
  if(!sel&&(e.key==='ArrowRight'||e.key==='PageDown')){e.preventDefault();goScene(doc.cur+1,true)}
  if(!sel&&(e.key==='ArrowLeft'||e.key==='PageUp')){e.preventDefault();goScene(doc.cur-1,false)}
- if(e.key==='Escape'&&sel){sel=null;renderProps();renderList();draw()}
+ if(e.key==='Escape'&&sel){clearSel();renderProps();renderList();draw()}
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='a'){e.preventDefault();const ids=[...doc.items.filter(i=>posOf(i.id)).map(i=>i.id),...(showMarks?doc.marks.map(m=>m.id):[])];selSet=new Set(ids);sel=ids[ids.length-1]||null;renderProps();renderList();draw()}
 });
 
 /* ---------- 2回押し ---------- */
@@ -643,7 +688,7 @@ HANGS.forEach((h,i)=>{const o=document.createElement('option');o.value=i;o.textC
 $('#addHang').onchange=e=>{const i=e.target.value;e.target.value='';e.target.blur();if(i==='')return;const [nm,kind,col,sheer,split]=HANGS[i],z=hangSize(kind);
  change(()=>{const it={id:uid(),type:'object',drape:kind!=='panel',kind,name:nm,color:col,w:z.w,d:kind==='panel'?5:5,h:z.h,elev:z.elev,shape:'rect',stand:false,sheer:!!sheer,split:!!split};doc.items.push(it);scene().pos[it.id]={x:z.x,y:z.y,r:0,on:true,open:0};sel=it.id});closeMobile()};
 $('#addObj').onchange=e=>{const i=e.target.value;e.target.value='';e.target.blur();if(i==='')return;const p=PRESETS[i];
- closeMobile();change(()=>{const it={id:uid(),type:'object',name:p[0].replace(/ .*/,''),color:p[4],w:p[1],d:p[2],h:p[3],elev:0,shape:'rect',stand:!!p[5]};doc.items.push(it);scene().pos[it.id]={x:0,y:doc.theater.depth/2,r:0,on:true};sel=it.id})};
+ closeMobile();change(()=>{const it={id:uid(),type:'object',name:p[6]==='chairrow'?'パイプ椅子の列':p[0].replace(/ .*/,''),color:p[4],w:p[1],d:p[2],h:p[3],elev:0,shape:p[6]||'rect',stand:!!p[5]};doc.items.push(it);scene().pos[it.id]={x:0,y:doc.theater.depth/2,r:0,on:true};sel=it.id})};
 $('#addKuroko').onclick=()=>change(()=>{const n=doc.items.filter(i=>i.kuroko).length;const it={id:uid(),type:'actor',kuroko:true,name:'クロコ'+(n+1),color:BLACK,h:165,w:44,d:27,elev:0};doc.items.push(it);scene().pos[it.id]={x:0,y:Math.min(2.5,doc.theater.depth/2),r:0,on:true};sel=it.id});
 $('#addMark').onclick=()=>change(()=>{const n=doc.marks.length;const m={id:uid(),label:String(n+1),color:MCOL[n%MCOL.length],shape:'cross',size:30,x:0,y:Math.min(1.5,doc.theater.depth/2),r:0};doc.marks.push(m);showMarks=true;sel=m.id});
 $('#addActor').addEventListener('click',()=>setTimeout(closeMobile,0));$('#addKuroko').addEventListener('click',()=>setTimeout(closeMobile,0));$('#addMark').addEventListener('click',()=>setTimeout(closeMobile,0));
@@ -653,20 +698,46 @@ function setOn(id,on){change(()=>{const sc=scene();let p=sc.pos[id];if(!p){const
 function renderList(){
  const sc=scene();const h=[['actor','役者・クロコ',i=>i.type==='actor'],['object','舞台セット・小道具',i=>i.type==='object'&&!i.drape],['object','吊りもの・幕',i=>i.drape]].map(([tp,ttl,fl])=>{const its=doc.items.filter(fl);if(!its.length)return '';
   return `<h3 style="margin-top:8px">${ttl}</h3>`+its.map(it=>{const on=sc.pos[it.id]&&sc.pos[it.id].on;
-   return `<div class="it${sel===it.id?' sel':''}${on?'':' off'}" data-id="${it.id}"><span class="dot${tp==='object'?' sq':''}" style="background:${it.kuroko?BLACK:it.color};${it.kuroko?'box-shadow:0 0 0 1px #7a7f8c':''}"></span><span class="n">${esc(it.name)}</span><span class="s">${tp==='actor'?it.h+'cm':it.drape?'幅'+(it.w/100).toFixed(1)+'m':it.w+'×'+it.d}</span><button data-on="${it.id}" class="${on?'on':''}">${on?'出す':'裏'}</button></div>`}).join('')}).join('');
+   return `<div class="it${isS(it.id)?' sel':''}${on?'':' off'}" data-id="${it.id}"><span class="dot${tp==='object'?' sq':''}" style="background:${it.kuroko?BLACK:it.color};${it.kuroko?'box-shadow:0 0 0 1px #7a7f8c':''}"></span><span class="n">${esc(it.name)}</span><span class="s">${tp==='actor'?it.h+'cm':it.drape?'幅'+(it.w/100).toFixed(1)+'m':it.w+'×'+it.d}</span><button data-on="${it.id}" class="${on?'on':''}">${on?'出す':'裏'}</button></div>`}).join('')}).join('');
  const mk=(doc.marks||[]);
  $('#list').innerHTML=h+`<h3 style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">バミリ（全シーン共通）<button id="mShow" class="${showMarks?'on':''}" style="padding:2px 8px;font-size:11px">${showMarks?'表示中':'隠し中'}</button></h3>`+
   `<div class="it" style="cursor:default"><span class="dot sq" style="background:#ff3b3b"></span><span class="n">❌ ヘソ（舞台の中央・固定）</span><span class="s">ツラから ${f2(hesoMark().y)}m</span></div>`+
-  (mk.length?mk.map(m=>`<div class="it${sel===m.id?' sel':''}" data-id="${m.id}"><span class="dot sq" style="background:${m.color}"></span><span class="n">${esc(m.label||'（名前なし）')}</span><span class="s">${posLabel(m.x).replace(/（.*$/,'')}</span></div>`).join(''):'<p class="note">「＋ バミリ」で床にテープの目印を貼れます。</p>');
+  (mk.length?mk.map(m=>`<div class="it${isS(m.id)?' sel':''}" data-id="${m.id}"><span class="dot sq" style="background:${m.color}"></span><span class="n">${esc(m.label||'（名前なし）')}</span><span class="s">${posLabel(m.x).replace(/（.*$/,'')}</span></div>`).join(''):'<p class="note">「＋ バミリ」で床にテープの目印を貼れます。</p>');
  $('#mShow').onclick=()=>{showMarks=!showMarks;renderList();draw()};
- $$('#list .it').forEach(el=>el.onclick=e=>{if(e.target.dataset.on||!el.dataset.id)return;sel=el.dataset.id;renderProps();renderList();draw();if(isMobile()){$('#left').classList.remove('open');$('#right').classList.add('open')}});
+ $$('#list .it').forEach(el=>el.onclick=e=>{if(e.target.dataset.on||!el.dataset.id)return;if(e.shiftKey||e.metaKey||e.ctrlKey||multiMode){toggleSel(el.dataset.id);renderProps();renderList();draw();return}selectOne(el.dataset.id);renderProps();renderList();draw();if(isMobile()){$('#left').classList.remove('open');$('#right').classList.add('open')}});
  $$('#list [data-on]').forEach(b=>b.onclick=()=>{const id=b.dataset.on,p=scene().pos[id];setOn(id,!(p&&p.on))});
 }
 
 /* ---------- 詳細パネル ---------- */
 function field(lbl,key,val,unit,attrs=''){return `<div class="row"><label>${lbl}</label><input type="text" ${attrs} data-k="${key}" value="${esc(val)}">${unit?`<span class="u">${unit}</span>`:''}</div>`}
+function renderMulti(el){
+ const ids=selIds(),its=ids.map(item).filter(Boolean),mks=ids.map(markOf).filter(Boolean),pos=()=>ids.map(id=>[id,posRef(id)]).filter(([id,p])=>p&&(markOf(id)||p.on));
+ el.innerHTML=`<h3>${ids.length}個を選択中</h3><p class="note" style="margin-top:0">${esc([...its.map(i=>i.name),...mks.map(m=>'バミリ'+(m.label||''))].join('、'))}</p>
+  ${its.length?'<div class="grp"><button id="gOn">まとめて出す</button><button id="gOff">まとめて裏に</button></div>':''}
+  <h3 style="margin-top:12px">並べる・そろえる</h3>
+  <div class="grp"><button id="gRow">横一列に</button><button id="gCol">縦一列に</button></div>
+  <div class="grp"><button id="gDX">左右に等間隔</button><button id="gDY">前後に等間隔</button></div>
+  <div class="grp"><button id="gTsura">ツラ番号にそろえる</button><button id="gFace">客席向きに</button></div>
+  <div class="grp"><button id="gMirror">センターで左右反転</button></div>
+  <div class="grp" style="margin-top:12px"><button id="gDup">まとめて複製</button><button id="gDel" class="warn">まとめて削除</button></div>
+  <p class="note">横一列＝前後の位置をそろえる。縦一列＝左右の位置をそろえる。<br>ドラッグや矢印キーで、選んだものを一緒に動かせます。<br>PCはShift（またはCommand）を押しながらクリックで追加・解除。何もない所をShift＋ドラッグで囲んで選べます。スマホ・iPadは上の「複数」を押してからタップ。</p>`;
+ const avg=a=>a.reduce((s,v)=>s+v,0)/a.length;
+ if(its.length){$('#gOn').onclick=()=>change(()=>{for(const it of its){let p=scene().pos[it.id];if(!p){const l=lastPos(it.id);p=scene().pos[it.id]=l?{...l}:{x:0,y:doc.theater.depth/2,r:0,on:true}}p.on=true}});
+  $('#gOff').onclick=()=>change(()=>{for(const it of its){const p=scene().pos[it.id];if(p)p.on=false}})}
+ $('#gRow').onclick=()=>change(()=>{const P=pos();const y=+avg(P.map(([,p])=>p.y)).toFixed(2);P.forEach(([,p])=>p.y=y)});
+ $('#gCol').onclick=()=>change(()=>{const P=pos();const x=+avg(P.map(([,p])=>p.x)).toFixed(2);P.forEach(([,p])=>p.x=x)});
+ const dist=k=>change(()=>{const P=pos().sort((a,b)=>a[1][k]-b[1][k]);if(P.length<3)return;const a=P[0][1][k],b=P[P.length-1][1][k];P.forEach(([,p],i)=>p[k]=+(a+(b-a)*i/(P.length-1)).toFixed(3))});
+ $('#gDX').onclick=()=>dist('x');$('#gDY').onclick=()=>dist('y');
+ $('#gTsura').onclick=()=>{const st=doc.theater.tsura||1;change(()=>pos().forEach(([,p])=>p.x=+(Math.round(p.x/st)*st).toFixed(3)))};
+ $('#gFace').onclick=()=>change(()=>pos().forEach(([,p])=>{if('r' in p)p.r=0}));
+ $('#gMirror').onclick=()=>change(()=>pos().forEach(([,p])=>{p.x=-p.x;if('r' in p)p.r=-p.r}));
+ $('#gDup').onclick=()=>change(()=>{const ns=[];for(const it of its){const n={...it,id:uid(),name:it.name+'2'};doc.items.push(n);const q=scene().pos[it.id]||{x:0,y:2,r:0,on:true};scene().pos[n.id]={...q,x:q.x+0.5,on:true};ns.push(n.id)}
+  for(const m of mks){const n={...m,id:uid(),x:m.x+0.5};doc.marks.push(n);ns.push(n.id)}selSet=new Set(ns);sel=ns[ns.length-1]||null});
+ twice($('#gDel'),()=>change(()=>{const del=new Set(ids);doc.items=doc.items.filter(i=>!del.has(i.id));doc.scenes.forEach(s=>{for(const id of del)delete s.pos[id]});doc.marks=doc.marks.filter(m=>!del.has(m.id));clearSel()}),'もう一度押すと全部削除');
+}
 function renderProps(){
- const el=$('#props'),it=sel&&item(sel),mk=sel&&markOf(sel);
+ const el=$('#props');if(isMulti()){renderMulti(el);return}
+ const it=sel&&item(sel),mk=sel&&markOf(sel);
  if(mk){el.innerHTML=`<h3>バミリ</h3>${field('名前','m.label',mk.label||'','')}
   <div class="row"><label>色</label><select data-k="m.color">${[['#ff4d4d','赤'],['#ffd23f','黄'],['#3ecf8e','緑'],['#4ea1ff','青'],['#ff8ad8','ピンク'],['#ffffff','白'],['#ff9a3c','オレンジ'],['#b07cff','紫']].map(([v,n])=>`<option value="${v}"${mk.color===v?' selected':''}>${n}</option>`).join('')}</select></div>
   <div class="row"><label>形</label><select data-k="m.shape">${[['cross','十字（＋）'],['X','バツ（×）'],['T','T字'],['L','L字'],['line','一文字（－）'],['dot','点']].map(([v,n])=>`<option value="${v}"${(mk.shape||'cross')===v?' selected':''}>${n}</option>`).join('')}</select></div>
@@ -694,13 +765,14 @@ function renderProps(){
   el.innerHTML=`<h3>${it.kuroko?'クロコ':A?'役者':'舞台セット・小道具'}</h3>
   ${field('名前','name',it.name,'')}
   ${it.kuroko?'':`<div class="row"><label>色</label><input type="color" data-k="color" value="${it.color}"></div>`}
+  ${it.drape?`<div class="grp" style="margin-top:-2px">${[['#16161b','黒'],['#7a1622','赤'],['#1d2a4a','紺'],['#3a2a55','紫'],['#6b6f7a','グレー'],['#e8e8ee','白'],['#b8902f','金'],['#2e4a35','緑']].map(([v,n])=>`<button data-col="${v}" title="${n}" style="width:30px;height:28px;padding:0;background:${v};border-color:${it.color===v?'#fff':'#47506a'}"></button>`).join('')}</div>`:''}
   ${A?`<div class="row"><label>クロコ</label><input type="checkbox" data-k="kuroko" ${it.kuroko?'checked':''}><span class="note" style="margin:0">全身まっ黒にする</span></div>`:''}
   ${it.drape?field('幅','w',it.w,'cm','inputmode="decimal"')+field('丈（長さ）','h',it.h,'cm','inputmode="decimal"')+field('吊り高さ','elev',it.elev||0,'cm','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">床から幕のすそまで</div>'+
    `<div class="row"><label>紗（透ける）</label><input type="checkbox" data-k="sheer" ${it.sheer?'checked':''}></div><div class="row"><label>中割</label><input type="checkbox" data-k="split" ${it.split?'checked':''}><span class="note" style="margin:0">真ん中から左右に開く</span></div>`+
    (it.split&&on?`<h3 style="margin-top:10px">このシーンの開き</h3><div class="grp"><button id="dClose">閉める</button><button id="dOpen">開ける</button></div>`+field('開き','po',Math.round((p.open||0)*100),'%','inputmode="decimal"'):'')
   :A?field('身長','h',it.h,'cm','inputmode="decimal"')+field('肩幅','w',it.w,'cm','inputmode="decimal"')+field('体の厚み','d',it.d,'cm','inputmode="decimal"')
    :field('幅','w',it.w,'cm','inputmode="decimal"')+field('奥行','d',it.d,'cm','inputmode="decimal"')+field('高さ','h',it.h,'cm','inputmode="decimal"')+
-   `<div class="row"><label>形</label><select data-k="shape"><option value="rect"${it.shape!=='ellipse'?' selected':''}>四角</option><option value="ellipse"${it.shape==='ellipse'?' selected':''}>丸</option></select></div>
+   `<div class="row"><label>形</label><select data-k="shape"><option value="rect"${!['ellipse','chair','chairrow'].includes(it.shape)?' selected':''}>四角</option><option value="ellipse"${it.shape==='ellipse'?' selected':''}>丸</option><option value="chair"${it.shape==='chair'?' selected':''}>パイプ椅子</option><option value="chairrow"${it.shape==='chairrow'?' selected':''}>パイプ椅子の列（幅50cmで1脚）</option></select></div>
    <div class="row"><label>乗れる</label><input type="checkbox" data-k="stand" ${it.stand?'checked':''}><span class="note" style="margin:0">上に役者が乗ると正面図で持ち上がる</span></div>`}
   ${it.drape?'':field(A?'足元の高さ':'床からの高さ','elev',it.elev||0,'cm','inputmode="decimal"')}
   <h3 style="margin-top:12px">このシーンでの位置</h3>
@@ -708,6 +780,7 @@ function renderProps(){
   ${on?field('左右','px',f2(p.x),'m','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">センター0、上手が＋、下手が－</div>'+(doc.theater.tsura?'<div class="note" style="margin-top:-4px;color:#ffd27a">いま <span id="posNow">'+esc(posLabel(p.x))+'</span></div>':'')+field('前後','py',f2(p.y),'m','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">舞台のツラから奥へ</div>'+field('向き','pr',p.r,'°','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">0＝客席向き。平面図の青い丸をドラッグでも回せます</div><div class="grp"><button id="pCenter">センターへ</button><button id="pAll">この位置を後のシーンにも</button></div>':''}
   <div class="grp" style="margin-top:14px"><button id="pDup">複製</button><button id="pDel" class="warn">削除（全シーン）</button></div>`;
   $('#pOn').onclick=()=>setOn(it.id,!on);
+  $$('#props [data-col]').forEach(b=>b.onclick=()=>change(()=>{it.color=b.dataset.col}));
   if($('#dClose')){$('#dClose').onclick=()=>change(()=>{scene().pos[it.id].open=0});$('#dOpen').onclick=()=>change(()=>{scene().pos[it.id].open=1})}
   if(on){$('#pCenter').onclick=()=>change(()=>{scene().pos[it.id].x=0});
    $('#pAll').onclick=()=>change(()=>{for(let i=doc.cur+1;i<doc.scenes.length;i++)doc.scenes[i].pos[it.id]={...scene().pos[it.id]}})}
@@ -761,8 +834,8 @@ function renderThumbs(){
 function renderThumb(i){const c=$(`#thumbs .th[data-i="${i}"] canvas`);if(!c)return;const g=c.getContext('2d'),vw=fitView({},240,124,'plan',4);g.setTransform(1,0,0,1,0,0);renderTo(g,240,124,vw,'plan',{scene:doc.scenes[i],ui:false,sel:null})}
 $('#scAdd').onclick=()=>change(()=>{const s=scene();const n={id:uid(),title:'シーン'+(doc.scenes.length+1),note:'',dur:s.dur||1.2,pos:JSON.parse(JSON.stringify(s.pos))};doc.scenes.splice(doc.cur+1,0,n);doc.cur++});
 twice($('#scDel'),()=>{if(doc.scenes.length<2){log('最後のシーンは消せません');return}change(()=>{doc.scenes.splice(doc.cur,1);doc.cur=clamp(doc.cur,0,doc.scenes.length-1)})},'もう一度で削除');
-$('#scL').onclick=()=>{if(doc.cur>0)change(()=>{const s=doc.scenes.splice(doc.cur,1)[0];doc.cur--;doc.scenes.splice(doc.cur,0,s)})};
-$('#scR').onclick=()=>{if(doc.cur<doc.scenes.length-1)change(()=>{const s=doc.scenes.splice(doc.cur,1)[0];doc.cur++;doc.scenes.splice(doc.cur,0,s)})};
+const _scL=()=>{if(doc.cur>0)change(()=>{const s=doc.scenes.splice(doc.cur,1)[0];doc.cur--;doc.scenes.splice(doc.cur,0,s)})};
+const _scR=()=>{if(doc.cur<doc.scenes.length-1)change(()=>{const s=doc.scenes.splice(doc.cur,1)[0];doc.cur++;doc.scenes.splice(doc.cur,0,s)})};
 
 /* ---------- 発表 ---------- */
 $('#bPresent').onclick=()=>{document.body.classList.add('pres');sel=null;try{document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen().catch(()=>{})}catch(e){}setTimeout(()=>{fitMain()},60);renderProps();draw()};
@@ -774,6 +847,7 @@ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement
 let cam3dInit=false;$$('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;if(mode==='3d'&&!cam3dInit){cam3dInit=true;camPreset('aud',true)}try{localStorage.setItem('butaiplan-mode',mode)}catch(e){}$$('[data-mode]').forEach(x=>x.classList.toggle('on',x===b));fitMain()});
 $('#tMove').onclick=()=>{tool='move';$('#tMove').classList.add('on');$('#tMeasure').classList.remove('on');measure=null;draw()};
 $('#tMeasure').onclick=()=>{tool='measure';$('#tMeasure').classList.add('on');$('#tMove').classList.remove('on');draw()};
+$('#tMulti').onclick=()=>{multiMode=!multiMode;$('#tMulti').classList.toggle('on',multiMode)};
 $('#bUndo').onclick=undo;$('#bRedo').onclick=redo;
 $('#bLeft').onclick=()=>{$('#left').classList.toggle('open');$('#right').classList.remove('open')};
 $('#bRight').onclick=()=>{$('#right').classList.toggle('open');$('#left').classList.remove('open')};
@@ -1023,7 +1097,7 @@ const cam={tx:0,ty:1.2,tz:-4,yaw:0,pitch:0.2,dist:14,fov:42*Math.PI/180};let cam
 function camEye(c){c=c||cam;const cp=Math.cos(c.pitch);return [c.tx+c.dist*Math.sin(c.yaw)*cp,c.ty+c.dist*Math.sin(c.pitch),c.tz+c.dist*Math.cos(c.yaw)*cp]}
 function camFrom(e,t){const d=sub(e,t),dist=Math.hypot(...d);return {tx:t[0],ty:t[1],tz:t[2],dist,pitch:Math.asin(clamp(d[1]/dist,-1,1)),yaw:Math.atan2(d[0],d[2])}}
 const CAMS={
- aud:['客席から',T=>{const z=Math.max(8,T.width*0.85),sh=T.stageH??0.9;return [[0,-sh+Math.max(0,(z-2.2)/0.95)*0.14+1.2,z],[0,1.1,-T.depth*0.45]]}],
+ aud:['客席から',T=>{const z=Math.max(8,T.width*0.85),sh=T.stageH??0.9;return [[0,-sh+1.15,z],[0,0.9,-T.depth*0.45]]}],
  bal:['2階席',T=>[[0,6.5,T.width*1.05+5],[0,0.4,-T.depth*0.45]]],
  diag:['ななめ',T=>[[T.width*0.85,T.width*0.55+2,T.width*0.6+3],[0,0.4,-T.depth*0.45]]],
  top:['真上',T=>[[0,Math.max(T.width,T.depth)*1.35+3,-T.depth*0.5+0.01],[0,0,-T.depth*0.5]]],
@@ -1040,11 +1114,11 @@ function initGL(){
  if(gl)return true;
  try{gl=glc.getContext('webgl',{antialias:true,preserveDrawingBuffer:true,alpha:false})}catch(e){gl=null}
  if(!gl){log('3D表示が使えません（WebGLなし）');return false}
- const vs=`attribute vec3 p;attribute vec3 n;attribute vec2 uv;uniform mat4 M,VP;varying vec3 vn;varying vec2 vuv;
+ const vs0=0;const vs=`attribute vec3 p;attribute vec3 n;attribute vec2 uv;uniform mat4 M,VP;varying vec3 vn;varying vec2 vuv;
  void main(){vn=mat3(M)*n;vuv=uv;gl_Position=VP*M*vec4(p,1.);}`;
  const fs=`precision mediump float;varying vec3 vn;varying vec2 vuv;uniform vec4 col;uniform float lit,useTex;uniform sampler2D tex;
  void main(){vec4 c=col;if(useTex>.5){c=texture2D(tex,vuv);c.a*=col.a;}
- if(lit>.5){vec3 N=normalize(vn);float d=max(dot(N,normalize(vec3(.35,.85,.55))),0.);float d2=max(dot(N,normalize(vec3(-.5,.4,.3))),0.);float up=max(N.y,0.);
+ if(lit>.5){vec3 N=normalize(vn);if(!gl_FrontFacing)N=-N;float d=max(dot(N,normalize(vec3(.35,.85,.55))),0.);float d2=max(dot(N,normalize(vec3(-.5,.4,.3))),0.);float up=max(N.y,0.);
  c.rgb*= .30+.62*d+.18*d2+.08*up;}gl_FragColor=c;}`;
  const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o};
  const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
@@ -1065,6 +1139,14 @@ function mkSph(a,b){const P=[],N=[],I=[];for(let j=0;j<=b;j++){const t=j/b*Math.
  for(let j=0;j<b;j++)for(let i=0;i<a;i++){const p=j*(a+1)+i,q=p+a+1;I.push(p,q,p+1,p+1,q,q+1)}return mkMesh(P,N,null,I)}
 function mkDisk(s){const P=[0,0,0],N=[0,1,0],I=[];for(let i=0;i<=s;i++){const a=i/s*Math.PI*2;P.push(Math.cos(a)*.5,0,Math.sin(a)*.5);N.push(0,1,0)}for(let i=0;i<s;i++)I.push(0,1+i,2+i);return mkMesh(P,N,null,I)}
 function mkQuad(){return mkMesh([0,0,0,1,0,0,1,0,1,0,0,1],[0,1,0,0,1,0,0,1,0,0,1,0],[0,0,1,0,1,1,0,1],[0,1,2,0,2,3])}
+// 波打つ幕のメッシュ（幅w・高さh・波長lam・振れ幅amp、単位m）
+const WAVY=new Map();
+function wavyMesh(w,h,lam,amp){const key=w.toFixed(2)+'|'+h.toFixed(2)+'|'+lam.toFixed(3)+'|'+amp.toFixed(3);let m=WAVY.get(key);if(m)return m;
+ if(WAVY.size>120)WAVY.clear();const n=Math.min(1200,Math.max(4,Math.ceil(w/(lam/10)))),P=[],N=[],I=[],k=2*Math.PI/lam;
+ for(let i=0;i<=n;i++){const x=-w/2+w*i/n,z=amp*Math.sin(k*(x+w/2)),dz=amp*k*Math.cos(k*(x+w/2)),l=Math.hypot(dz,1);P.push(x,0,z,x,h,z);N.push(-dz/l,0,1/l,-dz/l,0,1/l)}
+ for(let i=0;i<n;i++){const a=i*2;I.push(a,a+1,a+3,a,a+3,a+2)}
+ m=mkMesh(P,N,null,I);WAVY.set(key,m);return m}
+function drapeWave(it,w2){const full=it.split?it.w/200:it.w/100,g=clamp(w2/full,0.12,1);return {lam:Math.max(0.07,0.34*g),amp:(it.sheer?0.045:0.075)*(g<1?1.25:1)}}
 function rgb(h){const n=parseInt(h.slice(1),16);return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255]}
 function dm(mesh,M,col,o){o=o||{};const a=G3.a;
  gl.bindBuffer(gl.ARRAY_BUFFER,mesh.p);gl.enableVertexAttribArray(a.p);gl.vertexAttribPointer(a.p,3,gl.FLOAT,false,0,0);
@@ -1075,6 +1157,17 @@ function dm(mesh,M,col,o){o=o||{};const a=G3.a;
  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,mesh.i);gl.drawElements(gl.TRIANGLES,mesh.c,gl.UNSIGNED_SHORT,0)}
 const BX=(x0,y0,z0,x1,y1,z1)=>chain(M4.t((x0+x1)/2,y0,(z0+z1)/2),M4.s(Math.abs(x1-x0),y1-y0,Math.abs(z1-z0)));// GL座標の箱
 
+function boxInto(P,N,I,x0,y0,z0,x1,y1,z1){const F=[[[1,0,0],[0,0,-1],[0,1,0]],[[-1,0,0],[0,0,1],[0,1,0]],[[0,1,0],[1,0,0],[0,0,-1]],[[0,-1,0],[1,0,0],[0,0,1]],[[0,0,1],[1,0,0],[0,1,0]],[[0,0,-1],[-1,0,0],[0,1,0]]];
+ const cx=(x0+x1)/2,cy=(y0+y1)/2,cz=(z0+z1)/2,sx=Math.abs(x1-x0)/2,sy=Math.abs(y1-y0)/2,sz=Math.abs(z1-z0)/2;
+ for(const [n,u,v] of F){const b=P.length/3;for(const [a,c] of [[-1,-1],[1,-1],[1,1],[-1,1]]){P.push(cx+(n[0]+u[0]*a+v[0]*c)*sx,cy+(n[1]+u[1]*a+v[1]*c)*sy,cz+(n[2]+u[2]*a+v[2]*c)*sz);N.push(...n)}I.push(b,b+1,b+2,b,b+2,b+3)}}
+let AUD=null;
+function audMesh(T){const sh=T.stageH??0.9,key=T.width+'|'+sh;if(AUD&&AUD.key===key)return AUD;
+ const S={P:[],N:[],I:[]},Fm={P:[],N:[],I:[]},hw=T.width/2+1,xs=[];for(let x=-hw+0.26;x<=hw-0.26;x+=0.52)if(Math.abs(x)>0.6)xs.push(x);
+ const rows=Math.max(3,Math.min(12,Math.floor(440/Math.max(1,xs.length))));
+ for(let r=0;r<rows;r++){const z=2.1+r*0.95,y=-sh;for(const x of xs){const t=0.02;
+  boxInto(S.P,S.N,S.I,x-0.21,y+0.41,z-0.2,x+0.21,y+0.44,z+0.18);boxInto(S.P,S.N,S.I,x-0.2,y+0.55,z+0.19,x+0.2,y+0.78,z+0.22);
+  for(const sx of [-1,1]){const lx=x+sx*0.2;boxInto(Fm.P,Fm.N,Fm.I,lx-t/2,y,z-0.19,lx+t/2,y+0.43,z-0.17);boxInto(Fm.P,Fm.N,Fm.I,lx-t/2,y,z+0.2,lx+t/2,y+0.8,z+0.22)}}}
+ AUD={key,seat:mkMesh(S.P,S.N,null,S.I),frame:mkMesh(Fm.P,Fm.N,null,Fm.I)};return AUD}
 function floorMesh(T){const key=JSON.stringify([T.width,T.depth,T.outline]);if(G3.floorKey===key)return G3.floor;
  let poly=T.outline&&T.outline.length>2?T.outline.map(([x,y])=>[x,-y]):[[-T.width/2,0],[T.width/2,0],[T.width/2,-T.depth],[-T.width/2,-T.depth]];
  // 耳切り（三角形分割）
@@ -1153,28 +1246,30 @@ function draw3d(){
   for(const [zz,dir] of zs)for(let i=0;i*st<=max+1e-6;i++)for(const xx of i?[i*st,-i*st]:[0]){if(xx<b.x0||xx>b.x1)continue;dm(G3.m.box,BX(xx-0.012,0.002,zz,xx+0.012,0.004,zz+dir*0.15),i===0?'#ff4d4d':'#ffd27a',{lit:false})}gl.disable(gl.BLEND)}
  // バミリ
  for(const m of allMarks()){const B=chain(M4.t(m.x,0.002,-m.y),M4.ry(-(m.r||0)*Math.PI/180));for(const [x,y,w,d,a] of markArms(m))dm(G3.m.box,chain(B,M4.t(x,0,y),M4.ry(-(a||0)*Math.PI/180),M4.s(w,0.003,d)),m.color,{lit:false});
-  if(sel===m.id){const r=(m.size||30)/200+0.08,pts=[];for(let i=0;i<=40;i++){const t=i/40*Math.PI*2;pts.push([m.x+Math.cos(t)*r,0.01,-m.y+Math.sin(t)*r])}line3(pts,'#4ea1ff',1,gl.LINE_STRIP)}}
+  if(isS(m.id)){const r=(m.size||30)/200+0.08,pts=[];for(let i=0;i<=40;i++){const t=i/40*Math.PI*2;pts.push([m.x+Math.cos(t)*r,0.01,-m.y+Math.sin(t)*r])}line3(pts,'#4ea1ff',1,gl.LINE_STRIP)}}
  for(const s of [-1,1])dm(G3.m.box,BX(s>0?xr:xl-0.2,-sh,0.3,s>0?xr+0.2:xl,top+1.5,-(T.depth+0.45)),'#15171f');
  // 客席
  dm(G3.m.box,BX(xl-4,-sh-0.1,0,xr+4,-sh,18),'#1b1719');
- for(let i=0;i<14;i++){const z=2.2+i*0.95,y=-sh+i*0.14;dm(G3.m.box,BX(-hw-0.5,-sh,z,hw+0.5,y,z+0.95),'#1d191b');
-  for(const [a,c] of [[-hw-0.5,-1.1],[1.1,hw+0.5]])dm(G3.m.box,BX(a,y,z+0.15,c,y+0.45,z+0.7),'#5a1e2a'),dm(G3.m.box,BX(a,y+0.45,z+0.6,c,y+0.85,z+0.72),'#6a2232')}
+ {const A=audMesh(T);dm(A.seat,M4.id(),'#3c4250');dm(A.frame,M4.id(),'#8a9099')}
  // もの・役者
  const sc=scene(),its=doc.items.map(it=>({it,p:posOf(it.id,sc)})).filter(e=>e.p);
  const solid=its.filter(e=>e.p.a>=0.999),fade=its.filter(e=>e.p.a<0.999);
  const drawIt=({it,p})=>{const z0=baseZ(it,p,sc);
-  if(it.type==='actor'){drawPerson3(it,p,z0,sel===it.id,p.a);return}
+  if(it.type==='actor'){drawPerson3(it,p,z0,isS(it.id),p.a);return}
   if(it.drape){const B=itemM(it,p,z0),d=Math.max(it.d/100,0.03),hh=it.h/100,al=p.a*(it.sheer?.35:1);if(it.sheer){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false)}
-   for(const [cx,w2] of drapePanels(it,p.open)){const n=Math.max(1,Math.round(w2/0.22)),sw=w2/n;for(let i=0;i<n;i++){const x=cx-w2/2+sw*(i+0.5);dm(G3.m.box,chain(B,M4.t(x,0,(i%2?0.03:-0.03)),M4.s(sw*1.08,hh,d)),i%2?shade(it.color,0.8):it.color,{a:al})}}
+   for(const [cx,w2] of drapePanels(it,p.open)){const wv=drapeWave(it,w2);dm(wavyMesh(w2,hh,wv.lam,wv.amp),chain(B,M4.t(cx,0,0)),it.color,{a:al})}
    if(it.sheer){gl.depthMask(true);gl.disable(gl.BLEND)}
-   if(sel===it.id){const w=it.w/200+0.05,B2=itemM(it,p,z0+0.01),pts=[[-w,0,-0.12],[w,0,-0.12],[w,0,0.12],[-w,0,0.12],[-w,0,-0.12]].map(q=>{const v=M4.mul(B2,M4.t(...q));return [v[12],v[13],v[14]]});line3(pts,'#4ea1ff',1,gl.LINE_STRIP)}return}
-  const M=chain(itemM(it,p,z0),M4.s(it.w/100,it.h/100,it.d/100));dm(it.shape==='ellipse'?G3.m.cyl:G3.m.box,M,it.color,{a:p.a});
-  if(sel===it.id){const w=it.w/200+0.05,d=it.d/200+0.05,B=itemM(it,p,z0+it.h/100+0.01),pts=[[-w,0,-d],[w,0,-d],[w,0,d],[-w,0,d],[-w,0,-d]].map(q=>{const v=M4.mul(B,M4.t(...q));return [v[12],v[13],v[14]]});line3(pts,'#4ea1ff',1,gl.LINE_STRIP)}};
+   if(isS(it.id)){const w=it.w/200+0.05,B2=itemM(it,p,z0+0.01),pts=[[-w,0,-0.12],[w,0,-0.12],[w,0,0.12],[-w,0,0.12],[-w,0,-0.12]].map(q=>{const v=M4.mul(B2,M4.t(...q));return [v[12],v[13],v[14]]});line3(pts,'#4ea1ff',1,gl.LINE_STRIP)}return}
+  if(isChair(it)){const B=itemM(it,p,z0),{cw,xs}=chairXs(it),D=it.d/100,H=it.h/100,o={a:p.a},fr='#a6acb6',sh2=H*0.55,bx=(x0,y0,z0_,x1,y1,z1,col)=>dm(G3.m.box,chain(B,BX(x0,y0,z0_,x1,y1,z1)),col,o);
+   for(const x of xs){const hw2=cw*0.44,t=0.022;bx(x-hw2,sh2-0.03,-D/2+0.06,x+hw2,sh2,D/2-0.02,it.color);bx(x-hw2+0.01,H*0.68,-D/2+0.02,x+hw2-0.01,H,-D/2+0.05,it.color);
+    for(const sx2 of [-1,1]){const lx=x+sx2*(hw2-t/2);bx(lx-t/2,0,D/2-0.06-t,lx+t/2,sh2,D/2-0.06,fr);bx(lx-t/2,0,-D/2+0.03,lx+t/2,H,-D/2+0.03+t,fr)}}
+  }else{const M=chain(itemM(it,p,z0),M4.s(it.w/100,it.h/100,it.d/100));dm(it.shape==='ellipse'?G3.m.cyl:G3.m.box,M,it.color,{a:p.a})}
+  if(isS(it.id)){const w=it.w/200+0.05,d=it.d/200+0.05,B=itemM(it,p,z0+it.h/100+0.01),pts=[[-w,0,-d],[w,0,-d],[w,0,d],[-w,0,d],[-w,0,-d]].map(q=>{const v=M4.mul(B,M4.t(...q));return [v[12],v[13],v[14]]});line3(pts,'#4ea1ff',1,gl.LINE_STRIP)}};
  solid.forEach(drawIt);
  if(fade.length){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);fade.forEach(drawIt);gl.disable(gl.BLEND)}
  // 緞帳
  if(T.don&&T.don.on){const dn=donAt(sc),bot=T.height*(1-dn),hh=T.height+1.2-bot,W2=T.width+0.6,n=Math.round(W2/0.3),sw=W2/n;
-  if(dn>0.005){for(let i=0;i<n;i++)dm(G3.m.box,BX(-W2/2+sw*i-0.01,bot,-0.28+(i%2?0.035:-0.035),-W2/2+sw*(i+1)+0.01,bot+hh,-0.36+(i%2?0.035:-0.035)),i%2?shade(T.don.color,0.78):T.don.color);
+  if(dn>0.005){dm(wavyMesh(W2,hh,0.36,0.08),M4.t(0,bot,-0.32),T.don.color);
    dm(G3.m.box,BX(-W2/2,bot,-0.25,W2/2,bot+0.1,-0.4),'#c9a24a')}}
  // ピンスポット
  if(spots){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);
@@ -1191,9 +1286,11 @@ function draw3d(){
  ctx.globalAlpha=1;
  if(T.tsura){const st=T.tsura,max=Math.max(-b.x0,b.x1),every=Math.max(1,Math.ceil(0.9/st)>1&&cam.dist>25?2:1),zs=[0];if(T.tsuraBack)zs.push(-T.depth);ctx.font='700 11px sans-serif';ctx.textBaseline='top';
   for(const zz of zs)for(let i=0;i*st<=max+1e-6;i+=every)for(const xx of i?[i*st,-i*st]:[0]){if(xx<b.x0||xx>b.x1)continue;const q=proj3([xx,0.01,zz+(zz===0?0.05:-0.05)],r.width,r.height);if(!q)continue;ctx.fillStyle=i===0?'#ff6b6b':'#ffd27a';ctx.fillText(i===0?'0':String(i),q[0],q[1]+2)}}
- {ctx.font='700 10px sans-serif';ctx.textBaseline='bottom';for(const m of allMarks()){if(!m.label)continue;const q=proj3([m.x,0.02,-m.y],r.width,r.height);if(!q)continue;ctx.fillStyle=m.color;ctx.fillText(m.label,q[0],q[1]-6)}}
+ {for(const m of allMarks()){const q=proj3([m.x,0.02,-m.y],r.width,r.height);if(!q)continue;const q2=proj3([m.x+(m.size||30)/200,0.02,-m.y],r.width,r.height),pl=q2?Math.hypot(q2[0]-q[0],q2[1]-q[1]):0;
+   if(pl<14){ctx.save();ctx.translate(q[0],q[1]);ctx.strokeStyle='rgba(0,0,0,.7)';ctx.lineWidth=4.5;const g=()=>{ctx.beginPath();if(m.shape==='X'){ctx.moveTo(-5,-4);ctx.lineTo(5,4);ctx.moveTo(5,-4);ctx.lineTo(-5,4)}else{ctx.moveTo(-6,0);ctx.lineTo(6,0);ctx.moveTo(0,-4);ctx.lineTo(0,4)}ctx.stroke()};g();ctx.strokeStyle=m.color;ctx.lineWidth=2.2;g();ctx.restore()}
+   if(m.label)markLabel(ctx,m,q[0]+Math.max(pl,7)+2,q[1]-3)}}
  ctx.shadowBlur=0;
- if(sel&&markOf(sel)){const m=markOf(sel),q=proj3([m.x,0.02,-m.y],r.width,r.height);if(q){ctx.font='600 11px sans-serif';ctx.fillStyle='#4ea1ff';ctx.textBaseline='top';tag(ctx,posLabel(m.x)+'／ツラから '+f2(m.y)+'m',q[0],q[1]+16)}}
+ if(sel&&!isMulti()&&markOf(sel)){const m=markOf(sel),q=proj3([m.x,0.02,-m.y],r.width,r.height);if(q){ctx.font='600 11px sans-serif';ctx.fillStyle='#4ea1ff';ctx.textBaseline='top';tag(ctx,posLabel(m.x)+'／ツラから '+f2(m.y)+'m',q[0],q[1]+16)}}
  if(sel){const s=its.find(e=>e.it.id===sel);if(s){const q=proj3([s.p.x,0.02,-s.p.y],r.width,r.height);if(q){ctx.font='600 11px sans-serif';ctx.fillStyle='#4ea1ff';ctx.textBaseline='top';
   const lx=posLabel(s.p.x);tag(ctx,lx+'／ツラから '+f2(s.p.y)+'m',q[0],q[1]+8)}}}
  if(camAnim)loop();
@@ -1210,12 +1307,15 @@ function hit3(sx,sy){const r=cv.getBoundingClientRect(),sc=scene();let best=null
 let drag3=null;
 function down3(e,sx,sy){
  if(ptrs.size===2){const [a,b]=[...ptrs.values()];drag3={t:'pinch',d0:Math.hypot(a.x-b.x,a.y-b.y),dist0:cam.dist,cx:(a.x+b.x)/2,cy:(a.y+b.y)/2,c0:{...cam}};return}
- camAnim=null;const h=e.button===0&&!e.shiftKey?hit3(sx,sy):null;
- if(h){if(sel!==h.it.id){sel=h.it.id;renderProps();renderList()}const q=hitPlane(ray3(sx,sy),h.z0),p=posRef(h.it.id);
-  drag3={t:'item',y:h.z0,dx:q?p.x-q[0]:0,dy:q?p.y+q[2]:0,s0:snap(),moved:false};draw();return}
- if(e.button===0&&!e.shiftKey&&showMarks){const q=hitPlane(ray3(sx,sy),0);if(q){let best=null,bd=1e9;for(const m of doc.marks||[]){const d=Math.hypot(q[0]-m.x,-q[2]-m.y);if(d<Math.max((m.size||30)/200,0.15)&&d<bd){bd=d;best=m}}
-  if(best){if(sel!==best.id){sel=best.id;renderProps();renderList()}drag3={t:'item',y:0,dx:best.x-q[0],dy:best.y+q[2],s0:snap(),moved:false};draw();return}}}
- if(e.button===0&&!e.shiftKey&&sel){sel=null;renderProps();renderList()}
+ camAnim=null;const add=e.metaKey||e.ctrlKey||multiMode||(e.shiftKey&&e.button===0&&!!hit3(sx,sy));
+ let hid=null,hy=0;if(e.button===0&&(!e.shiftKey||add)){const h=hit3(sx,sy);if(h){hid=h.it.id;hy=h.z0}
+  else if(showMarks){const q=hitPlane(ray3(sx,sy),0);if(q){let bd=1e9;for(const m of doc.marks||[]){const d=Math.hypot(q[0]-m.x,-q[2]-m.y);if(d<Math.max((m.size||30)/200,0.2)&&d<bd){bd=d;hid=m.id}}}}}
+ if(hid){if(add){toggleSel(hid);renderProps();renderList();draw();return}
+  const q=hitPlane(ray3(sx,sy),hy);
+  if(isMulti()&&selSet.has(hid)){const st={};for(const id of selIds()){const p=posRef(id);if(p)st[id]={x:p.x,y:p.y}}drag3={t:'group',y:hy,q0:q,st,s0:snap(),moved:false};return}
+  if(sel!==hid||isMulti()){selectOne(hid);renderProps();renderList()}const p=posRef(hid);
+  drag3={t:'item',y:hy,dx:q?p.x-q[0]:0,dy:q?p.y+q[2]:0,s0:snap(),moved:false};draw();return}
+ if(e.button===0&&!e.shiftKey&&sel){clearSel();renderProps();renderList()}
  drag3={t:(e.button===2||e.shiftKey)?'pan':'orbit',x:sx,y:sy,c0:{...cam}};draw()}
 function move3(e,sx,sy){
  if(!drag3){cv.style.cursor=hit3(sx,sy)?'move':'grab';return}
@@ -1223,10 +1323,11 @@ function move3(e,sx,sy){
   const cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;panBy(cx-drag3.cx,cy-drag3.cy,drag3.c0);draw();return}
  if(drag3.t==='orbit'){cam.yaw=drag3.c0.yaw-(sx-drag3.x)*0.006;cam.pitch=clamp(drag3.c0.pitch+(sy-drag3.y)*0.005,-0.15,1.55);draw();return}
  if(drag3.t==='pan'){panBy(sx-drag3.x,sy-drag3.y,drag3.c0);draw();return}
+ if(drag3.t==='group'){const q=hitPlane(ray3(sx,sy),drag3.y);if(!q||!drag3.q0)return;const dx=snapv(q[0]-drag3.q0[0],e.altKey),dy=snapv(-(q[2]-drag3.q0[2]),e.altKey);for(const id in drag3.st){const p=posRef(id);if(p){p.x=+(drag3.st[id].x+dx).toFixed(3);p.y=+(drag3.st[id].y+dy).toFixed(3)}}drag3.moved=true;draw();return}
  if(drag3.t==='item'){const q=hitPlane(ray3(sx,sy),drag3.y),p=posRef(sel);if(!q||!p)return;p.x=+snapv(q[0]+drag3.dx,e.altKey).toFixed(3);p.y=+snapv(-q[2]+drag3.dy,e.altKey).toFixed(3);drag3.moved=true;draw();liveProps()}}
 function panBy(dx,dy,c0){const r=cv.getBoundingClientRect(),e=camEye(c0),f=nrm(sub([c0.tx,c0.ty,c0.tz],e)),s=nrm(cross(f,[0,1,0])),u=cross(s,f),k=2*c0.dist*Math.tan(cam.fov/2)/r.height;
  cam.tx=c0.tx-(s[0]*dx-u[0]*dy)*k;cam.ty=clamp(c0.ty-(s[1]*dx-u[1]*dy)*k,-1,20);cam.tz=c0.tz-(s[2]*dx-u[2]*dy)*k}
-function up3(){if(!drag3)return;if(drag3.t==='pinch'){if(ptrs.size<2)drag3=null;return}if(drag3.t==='item'&&drag3.moved){pushUndo(drag3.s0);if(markOf(sel))renderList();renderThumb(doc.cur);save()}drag3=null}
+function up3(){if(!drag3)return;if(drag3.t==='pinch'){if(ptrs.size<2)drag3=null;return}if(drag3.t==='group'&&drag3.moved){pushUndo(drag3.s0);renderList();renderThumb(doc.cur);save()}if(drag3.t==='item'&&drag3.moved){pushUndo(drag3.s0);if(markOf(sel))renderList();renderThumb(doc.cur);save()}drag3=null}
 cv.addEventListener('contextmenu',e=>{if(mode==='3d')e.preventDefault()});
 $$('#cam3d [data-cam]').forEach(b=>b.onclick=()=>camPreset(b.dataset.cam));
 $('#bSpot').onclick=()=>{spots=!spots;$('#bSpot').classList.toggle('on',spots);draw()};
