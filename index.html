@@ -184,6 +184,7 @@ body.pres #present,body.pres #pexit{display:block}
  <div class="row"><label>高さ</label><input type="text" inputmode="decimal" id="tH"><span class="u">m</span></div>
  <div class="row"><label>舞台の高さ</label><input type="text" inputmode="decimal" id="tSH"><span class="u">m</span></div>
  <div class="row"><label>袖の幅</label><input type="text" inputmode="decimal" id="tWing"><span class="u">m</span></div>
+ <div class="row"><label>額縁</label><input type="checkbox" id="tArch"><span class="note" style="margin:0">プロセニアムアーチを出す</span></div>
  <div class="row"><label>緞帳</label><input type="checkbox" id="tDon"><span class="note" style="margin:0">緞帳がある劇場</span><input type="color" id="tDonC" style="margin-left:auto"></div>
  <div class="row"><label>ツラ番号</label><select id="tTsura"><option value="0">出さない</option><option value="0.5">50cmごと</option><option value="0.9">90cmごと</option><option value="0.909">3尺（90.9cm）ごと</option><option value="1">1mごと</option></select></div>
  <div class="row"><label>奥にも</label><input type="checkbox" id="tTsuraBack"><span class="note" style="margin:0">舞台奥にもヘソと番号を出す</span></div>
@@ -249,7 +250,7 @@ body.pres #present,body.pres #pexit{display:block}
 
 <script>
 'use strict';
-const VER='1.7.0';
+const VER='1.7.1';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -559,13 +560,15 @@ function drawFront(c,w,h,vw,sc,o){
  // 床
  [a,bb]=F(b.x0,0);[a2]=F(b.x1,0);c.fillStyle='#2a2f3e';c.fillRect(a,bb,a2-a,Math.max(3,0.15*k));c.strokeStyle='#8a90a2';c.lineWidth=1.5;c.beginPath();c.moveTo(a,bb);c.lineTo(a2,bb);c.stroke();
  // 額縁
- c.strokeStyle='#ffd27a';c.lineWidth=2.5;c.beginPath();let [p1,q1]=F(-hw,0),[p2,q2]=F(-hw,T.height),[p3]=F(hw,0);c.moveTo(p1,q1);c.lineTo(p1,q2);c.lineTo(p3,q2);c.lineTo(p3,q1);c.stroke();
+ const arch=T.arch!==false;let [p1,q1]=F(-hw,0),[p2,q2]=F(-hw,T.height),[p3]=F(hw,0);
+ if(arch){c.strokeStyle='#ffd27a';c.lineWidth=2.5;c.beginPath();c.moveTo(p1,q1);c.lineTo(p1,q2);c.lineTo(p3,q2);c.lineTo(p3,q1);c.stroke()}
+ else{c.strokeStyle='rgba(255,210,122,.45)';c.lineWidth=1.2;c.setLineDash([5,5]);c.beginPath();c.moveTo(p1,q1);c.lineTo(p1,q2);c.moveTo(p3,q1);c.lineTo(p3,q2);c.stroke();c.setLineDash([])}
  // センター
  c.setLineDash([6,5]);c.strokeStyle='rgba(255,210,122,.35)';c.lineWidth=1;c.beginPath();[p1,q1]=F(0,0);[,q2]=F(0,T.height);c.moveTo(p1,q1);c.lineTo(p1,q2);c.stroke();c.setLineDash([]);
  // 高さ目盛
  c.font='10px sans-serif';c.fillStyle='#6a7082';c.textAlign='right';c.textBaseline='middle';const st=niceStep(k);
  for(let z=st;z<=T.height+1e-6;z+=st){const [x,y]=F(b.x0,z);c.fillText(z+'m',x-3,y)}
- c.textAlign='center';c.textBaseline='bottom';c.fillStyle='#ffd27a';[p1,q1]=F(0,T.height);c.font='600 11px sans-serif';c.fillText('額縁 間口'+f2(T.width)+'m × 高さ'+f2(T.height)+'m',p1,q1-3);
+ c.textAlign='center';c.textBaseline='bottom';c.fillStyle='#ffd27a';[p1,q1]=F(0,T.height);c.font='600 11px sans-serif';c.fillText((arch?'額縁 間口':'舞台 間口')+f2(T.width)+'m × 高さ'+f2(T.height)+'m',p1,q1-3);
  c.fillStyle='#8a90a2';c.font='600 12px sans-serif';c.textBaseline='middle';[p1,q1]=F(b.x0+0.3,T.height*0.5);c.textAlign='left';c.fillText('下手',p1,q1);[p1,q1]=F(b.x1-0.3,T.height*0.5);c.textAlign='right';c.fillText('上手',p1,q1);
  // ツラ番号
  if(T.tsura){const st=T.tsura,max=Math.max(-b.x0,b.x1),every=st*k<16?Math.ceil(16/(st*k)):1;c.font='600 10px sans-serif';c.textAlign='center';c.textBaseline='top';
@@ -891,7 +894,7 @@ $('#bLeft').onclick=()=>{$('#left').classList.toggle('open');$('#right').classLi
 $('#bRight').onclick=()=>{$('#right').classList.toggle('open');$('#left').classList.remove('open')};
 
 /* ---------- 劇場設定 ---------- */
-function openTheater(){const T=doc.theater;$('#tName').value=T.name;$('#tW').value=f2(T.width);$('#tD').value=f2(T.depth);$('#tH').value=f2(T.height);$('#tWing').value=f2(T.wing);$('#tSH').value=f2(T.stageH??0.9);$('#tGrid').value=String(T.grid);$('#tDon').checked=!!(T.don&&T.don.on);$('#tDonC').value=(T.don&&T.don.color)||'#7a1622';$('#tTsura').value=String(T.tsura||0);$('#tTsuraBack').checked=!!T.tsuraBack;renderUlCtl();$('#mTheater').classList.add('show')}
+function openTheater(){const T=doc.theater;$('#tName').value=T.name;$('#tW').value=f2(T.width);$('#tD').value=f2(T.depth);$('#tH').value=f2(T.height);$('#tWing').value=f2(T.wing);$('#tSH').value=f2(T.stageH??0.9);$('#tGrid').value=String(T.grid);$('#tArch').checked=T.arch!==false;$('#tDon').checked=!!(T.don&&T.don.on);$('#tDonC').value=(T.don&&T.don.color)||'#7a1622';$('#tTsura').value=String(T.tsura||0);$('#tTsuraBack').checked=!!T.tsuraBack;renderUlCtl();$('#mTheater').classList.add('show')}
 $('#bTheater').onclick=openTheater;$('#tClose').onclick=()=>{$('#mTheater').classList.remove('show');fitMain()};
 $('#mTheater').addEventListener('pointerdown',e=>{if(e.target.id==='mTheater'){$('#mTheater').classList.remove('show');fitMain()}});
 const tSet=(k,fn)=>{const el=$(k);el.onchange=()=>{change(()=>fn(el.value));openTheater();fitMain()};el.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing)el.blur()}};
@@ -900,6 +903,7 @@ for(const [id,fn,dec,mn,mx] of [['#tW',v=>doc.theater.width=v,2,1,200],['#tD',v=
 tSet('#tName',v=>doc.theater.name=v||'劇場');tSet('#tW',v=>doc.theater.width=clamp(num(v,doc.theater.width),1,200));tSet('#tD',v=>doc.theater.depth=clamp(num(v,doc.theater.depth),1,200));
 tSet('#tH',v=>doc.theater.height=clamp(num(v,doc.theater.height),1,100));tSet('#tSH',v=>doc.theater.stageH=clamp(num(v,0.9),0,5));tSet('#tWing',v=>doc.theater.wing=clamp(num(v,doc.theater.wing),0,50));
 $('#tTsura').onchange=()=>{change(()=>doc.theater.tsura=+$('#tTsura').value)};$('#tTsuraBack').onchange=()=>{change(()=>doc.theater.tsuraBack=$('#tTsuraBack').checked)};
+$('#tArch').onchange=()=>{change(()=>{doc.theater.arch=$('#tArch').checked})};
 $('#tDon').onchange=()=>{change(()=>{doc.theater.don=doc.theater.don||{color:'#7a1622'};doc.theater.don.on=$('#tDon').checked})};$('#tDonC').onchange=()=>{change(()=>{doc.theater.don=doc.theater.don||{on:true};doc.theater.don.color=$('#tDonC').value})};
 $('#tGrid').onchange=()=>{change(()=>doc.theater.grid=+$('#tGrid').value)};
 $$('[data-pre]').forEach(b=>b.onclick=()=>{const P={s:[7,5,4,2],m:[12,10,7,4],l:[18,15,9,6]}[b.dataset.pre];change(()=>{Object.assign(doc.theater,{width:P[0],depth:P[1],height:P[2],wing:P[3],outline:null})});openTheater();fitMain()});
@@ -1283,7 +1287,7 @@ function draw3d(){
  gl.depthMask(true);gl.disable(gl.BLEND);
  // 劇場の壁・額縁・袖幕
  const top=T.height,fr='#4a1820';
- dm(G3.m.box,BX(-hw-1.2,0,0.25,-hw,top+1.2,-0.15),fr);dm(G3.m.box,BX(hw,0,0.25,hw+1.2,top+1.2,-0.15),fr);dm(G3.m.box,BX(-hw-1.2,top,0.25,hw+1.2,top+1.2,-0.15),fr);
+ if(T.arch!==false){dm(G3.m.box,BX(-hw-1.2,0,0.25,-hw,top+1.2,-0.15),fr);dm(G3.m.box,BX(hw,0,0.25,hw+1.2,top+1.2,-0.15),fr);dm(G3.m.box,BX(-hw-1.2,top,0.25,hw+1.2,top+1.2,-0.15),fr)}
  dm(G3.m.box,BX(xl-0.2,-sh,-(T.depth+0.3),xr+0.2,top+1.5,-(T.depth+0.45)),'#1a2030');
  for(let i=1;i<=3;i++){const z=-T.depth*i/4;for(const s of [-1,1])dm(G3.m.box,BX(s*hw,0,z+0.03,s*(hw+1.6),top+0.4,z-0.03),'#121216')}
  // ツラ番号（目印の線）
