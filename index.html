@@ -105,6 +105,7 @@ body.pres #present,body.pres #pexit{display:block}
  #cam3d button{min-height:34px}
 }
 @media (max-width:900px){
+ html.iosweb #app{padding-top:calc(env(safe-area-inset-top) + 34px)}
  #app{grid-template-rows:auto 1fr auto}
  header{flex-wrap:wrap;overflow:visible;row-gap:6px;padding:6px 8px;height:auto}
  header button{padding:6px 8px;font-size:13px;min-height:34px}
@@ -125,7 +126,7 @@ body.pres #present,body.pres #pexit{display:block}
  #hud{display:none}
  #pexit{top:calc(10px + env(safe-area-inset-top))}
  #app{grid-template-columns:0 1fr 0}
- aside{position:fixed;top:calc(var(--hh,96px) + env(safe-area-inset-top));bottom:var(--fh,90px);width:270px;z-index:20;display:none;box-shadow:0 0 30px #000}
+ aside{position:fixed;top:var(--hh,96px);bottom:var(--fh,90px);width:270px;z-index:20;display:none;box-shadow:0 0 30px #000}
  #left{left:0}#right{right:0}
  aside.open{display:block}
  .mobileOnly{display:inline-block}
@@ -250,7 +251,9 @@ body.pres #present,body.pres #pexit{display:block}
 
 <script>
 'use strict';
-const VER='1.7.1';
+const VER='1.7.2';
+// iPhoneのSafari（ホーム画面から開いたとき以外）は画面の上をぼかすので、その分ボタンを下げる
+(()=>{const ios=/iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),sa=navigator.standalone||matchMedia('(display-mode: standalone)').matches;if(ios&&!sa)document.documentElement.classList.add('iosweb')})();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1408,7 +1411,7 @@ $('#bMenu').addEventListener('click',()=>{});
 /* ---------- 全体 ---------- */
 function renderAll(){renderList();renderProps();renderThumbs();draw()}
 new ResizeObserver(()=>{draw()}).observe($('#stage'));
-new ResizeObserver(()=>{document.documentElement.style.setProperty('--hh',$('#hdr').offsetHeight+'px');document.documentElement.style.setProperty('--fh',$('footer').offsetHeight+'px')}).observe($('#hdr'));
+new ResizeObserver(()=>{document.documentElement.style.setProperty('--hh',Math.round($('#hdr').getBoundingClientRect().bottom)+'px');document.documentElement.style.setProperty('--fh',$('footer').offsetHeight+'px')}).observe($('#hdr'));
 new ResizeObserver(()=>{if($('#cal').classList.contains('show'))calDraw()}).observe($('#calStage'));
 (async()=>{
  try{await DB.open();const s=await DB.get('doc');if(s){doc=fixDoc(JSON.parse(s));doc.cur=clamp(doc.cur||0,0,doc.scenes.length-1)}const u=await DB.get('ul');if(u){ulSrc=u;ulImg=await loadImg(u)}setStat(true,'保存済み')}
