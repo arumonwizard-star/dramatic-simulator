@@ -171,7 +171,7 @@ body.view #present{display:block}
 </aside>
 <div id="stage">
  <canvas id="gl"></canvas><canvas id="cv"></canvas>
- <div id="cam3d"><button data-cam="aud">客席から</button><button data-cam="bal">2階席</button><button data-cam="diag">ななめ</button><button data-cam="top">真上</button><button data-cam="sl">下手袖</button><button data-cam="sr">上手袖</button><button data-cam="back">奥から</button><button id="bSpot" class="on">ピンスポ</button><select id="camSel"><option value="">視点を選ぶ…</option><option value="aud">客席から</option><option value="bal">2階席</option><option value="diag">ななめ</option><option value="top">真上</option><option value="sl">下手袖</option><option value="sr">上手袖</option><option value="back">奥から</option></select></div>
+ <div id="cam3d"><button data-cam="aud">客席から</button><button data-cam="bal">2階席</button><button data-cam="diag">ななめ</button><button data-cam="top">真上</button><button data-cam="sl">下手袖</button><button data-cam="sr">上手袖</button><button data-cam="back">奥から</button><button id="bWash" class="on">地明かり</button><button id="bSpot" class="on">ピンスポ</button><select id="camSel"><option value="">視点を選ぶ…</option><option value="aud">客席から</option><option value="bal">2階席</option><option value="diag">ななめ</option><option value="top">真上</option><option value="sl">下手袖</option><option value="sr">上手袖</option><option value="back">奥から</option></select></div>
  <div id="tools"><button id="zIn" title="拡大">＋</button><button id="zOut" title="縮小">－</button><button id="zFit" title="全体を表示">⤢</button></div>
  <div id="hud"></div>
  <div id="present"><div class="tt"></div><div class="nt"></div><div class="pg"></div></div>
@@ -266,7 +266,7 @@ body.view #present{display:block}
 
 <script>
 'use strict';
-const VER='1.9.0';
+const VER='1.9.1';
 // iPhoneのSafari（ホーム画面から開いたとき以外）は画面の上をぼかすので、その分ボタンを下げる
 (()=>{const ios=/iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),sa=navigator.standalone||matchMedia('(display-mode: standalone)').matches;if(ios&&!sa)document.documentElement.classList.add('iosweb')})();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -380,8 +380,9 @@ function change(fn){pushUndo();const before=new Set(doc.items.map(i=>i.id));fn()
 // 座標: x=センターから上手(+)へ[m]、y=舞台のツラから奥(+)へ[m]、z=床から上[m]
 // 画面: sx=ox+x*k、平面 sy=oy+(G-y)*k、正面 sy=oy-z*k （G=奥行+1.2）
 const V={k:40,ox:0,oy:0};
-const G=()=>doc.theater.depth+1.2;
-const DIV=0.6; // 正面図と平面図の境（画面上の v）
+const SH=()=>doc.theater.stageH??0.9;
+const G=()=>doc.theater.depth+1.2+SH();
+const DIVV=()=>SH()+0.6; // 正面図と平面図の境（画面上の v）
 function pS(vw,x,y){return [vw.ox+x*vw.k, vw.oy+(G()-y)*vw.k]}
 function Sp(vw,sx,sy){return [(sx-vw.ox)/vw.k, G()-(sy-vw.oy)/vw.k]}
 function fS(vw,x,z){return [vw.ox+x*vw.k, vw.oy-z*vw.k]}
@@ -389,7 +390,7 @@ function stageBounds(){const T=doc.theater;let x0=-T.width/2,x1=T.width/2,y0=0,y
  if(T.outline)for(const [x,y] of T.outline){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
  return {x0:x0-T.wing,x1:x1+T.wing,y0,y1}}
 function fitView(vw,w,h,m,pad){const T=doc.theater,b=stageBounds();let vt,vb;
- if(m==='both'){vt=-(T.height+0.9);vb=G()-b.y0+2}else if(m==='plan'){vt=G()-b.y1-0.4;vb=G()-b.y0+2}else{vt=-(T.height+0.9);vb=0.5}
+ if(m==='both'){vt=-(T.height+0.9);vb=G()-b.y0+2.4}else if(m==='plan'){vt=G()-b.y1-0.4;vb=G()-b.y0+2.4}else{vt=-(T.height+0.9);vb=SH()+0.5}
  pad=pad??28;if(w<2*pad+10||h<2*pad+10){vw.k=vw.k||40;vw.ox=vw.ox||0;vw.oy=vw.oy||0;return vw}vw.k=Math.min((w-2*pad)/(b.x1-b.x0),(h-2*pad)/(vb-vt));vw.ox=w/2-(b.x0+b.x1)/2*vw.k;vw.oy=h/2-(vt+vb)/2*vw.k;return vw}
 
 // アニメーション
@@ -421,20 +422,35 @@ function footOverlap(a,pa,b,pb){return footPts(a,pa).some(([x,y])=>inFoot(b,pb,x
 const physicsOn=()=>doc.theater.physics!==false;
 function inPoly(poly,x,y){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [xi,yi]=poly[i],[xj,yj]=poly[j];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))c=!c}return c}
 // その点に舞台の床（舞台面か袖）があるか
-function onFloorPt(x,y){const T=doc.theater,hw=T.width/2,e=0.002;
+// 客席の並び：xs=椅子の左右位置、rows=列数、列の中心は ツラから 2.1+r*0.95 m 手前
+function audLayout(T){T=T||doc.theater;const hw=T.width/2+1,xs=[];for(let x=-hw+0.26;x<=hw-0.26;x+=0.52)if(Math.abs(x)>0.6)xs.push(x);
+ const rows=Math.max(3,Math.min(12,Math.floor(440/Math.max(1,xs.length))));return {hw,xs,rows,end:2.1+(rows-1)*0.95+0.9}}
+function onStageFloor(x,y){const T=doc.theater,hw=T.width/2,e=0.002;
  if(Math.abs(x)>=hw-e&&Math.abs(x)<=hw+T.wing+e&&y>=-e&&y<=T.depth+e)return true;
  if(T.outline&&T.outline.length>2)return inPoly(T.outline,x,y);
  return Math.abs(x)<=hw+e&&y>=-e&&y<=T.depth+e}
-function onFloorItem(it,p){if(it.type==='actor'||it.drape)return onFloorPt(p.x,p.y);return footPts(it,p).every(([x,y])=>onFloorPt(x,y))}
+function inAudience(x,y){const A=audLayout();return y<0&&y>=-A.end&&Math.abs(x)<=A.hw+0.3}
+// その場所の床の高さ（舞台=0、客席=舞台の高さぶん低い）
+function floorZ(x,y){return onStageFloor(x,y)?0:inAudience(x,y)?-SH():0}
+function onFloorPt(x,y){return onStageFloor(x,y)||inAudience(x,y)}
+function onFloorPtOld(x,y){const T=doc.theater,hw=T.width/2,e=0.002;
+ if(Math.abs(x)>=hw-e&&Math.abs(x)<=hw+T.wing+e&&y>=-e&&y<=T.depth+e)return true;
+ if(T.outline&&T.outline.length>2)return inPoly(T.outline,x,y);
+ return Math.abs(x)<=hw+e&&y>=-e&&y<=T.depth+e}
+function onFloorItem(it,p){if(it.type==='actor'||it.drape)return onFloorPt(p.x,p.y);const z=floorZ(p.x,p.y);return footPts(it,p).every(([x,y])=>onFloorPt(x,y)&&floorZ(x,y)===z)}
 // 床の上の形（回転した四角）。役者は体の幅の四角
 function boxOf(it,p){const a=p.r*Math.PI/180,c=Math.cos(a),s=Math.sin(a);let hw,hd;if(it.type==='actor'){hw=hd=Math.max(it.w,it.d)/200*0.82}else{hw=it.w/200;hd=it.d/200}return {cx:p.x,cy:p.y,u:[c,-s],v:[s,c],hw,hd}}
-function boxHit(A,B){for(const ax of [A.u,A.v,B.u,B.v]){const pr=X=>Math.abs(X.hw*(X.u[0]*ax[0]+X.u[1]*ax[1]))+Math.abs(X.hd*(X.v[0]*ax[0]+X.v[1]*ax[1]));if(Math.abs((B.cx-A.cx)*ax[0]+(B.cy-A.cy)*ax[1])>=pr(A)+pr(B)-0.004)return false}return true}
+function boxHit(A,B){for(const ax of [A.u,A.v,B.u,B.v]){const pr=X=>Math.abs(X.hw*(X.u[0]*ax[0]+X.u[1]*ax[1]))+Math.abs(X.hd*(X.v[0]*ax[0]+X.v[1]*ax[1]));if(Math.abs((B.cx-A.cx)*ax[0]+(B.cy-A.cy)*ax[1])>=pr(A)+pr(B)-0.01)return false}return true}
+function boxDepth(A,B){let m=1e9;for(const ax of [A.u,A.v,B.u,B.v]){const pr=X=>Math.abs(X.hw*(X.u[0]*ax[0]+X.u[1]*ax[1]))+Math.abs(X.hd*(X.v[0]*ax[0]+X.v[1]*ax[1]));m=Math.min(m,pr(A)+pr(B)-Math.abs((B.cx-A.cx)*ax[0]+(B.cy-A.cy)*ax[1]))}return m}
 // 動かない壁（額縁の柱）
-function wallBoxes(){const T=doc.theater,hw=T.width/2,out=[];if(T.arch!==false)for(const s of [-1,1])out.push({cx:s*(hw+0.6),cy:-0.05,u:[1,0],v:[0,1],hw:0.6,hd:0.2});return out}
+function wallBoxes(){const T=doc.theater,hw=T.width/2,out=[];if(T.arch!==false)for(const s of [-1,1])out.push({cx:s*(hw+0.6),cy:-0.05,u:[1,0],v:[0,1],hw:0.6,hd:0.2});
+ const A=audLayout(T),L=A.xs.filter(x=>x<0),Rr=A.xs.filter(x=>x>0);
+ for(let r=0;r<A.rows;r++){const y=-(2.1+r*0.95+0.01);for(const g of [L,Rr]){if(!g.length)continue;const x0=Math.min(...g)-0.21,x1=Math.max(...g)+0.21;out.push({cx:(x0+x1)/2,cy:y,u:[1,0],v:[0,1],hw:(x1-x0)/2,hd:0.21,aud:true})}}
+ return out}
 // その物がいまぶつかっている相手（高さが重なっているものだけ。上に乗っているのはぶつかりではない）
-function hitsOf(id,sc){const it=item(id),out=new Set();if(!it||it.drape)return out;const p=posOf(id,sc);if(!p)return out;const A=boxOf(it,p),z0=baseZ(it,p,sc),z1=z0+it.h/100;
- for(const o of doc.items){if(o===it||o.drape)continue;const q=posOf(o.id,sc);if(!q||q.a<.5)continue;const w0=baseZ(o,q,sc),w1=w0+o.h/100;if(Math.min(z1,w1)-Math.max(z0,w0)<=0.01)continue;if(boxHit(A,boxOf(o,q)))out.add(o.id)}
- if(z0<0.05)wallBoxes().forEach((B,i)=>{if(boxHit(A,B))out.add('__wall'+i)});return out}
+function hitsOf(id,sc){const it=item(id),out=new Map();if(!it||it.drape)return out;const p=posOf(id,sc);if(!p)return out;const A=boxOf(it,p),z0=baseZ(it,p,sc),z1=z0+it.h/100;
+ for(const o of doc.items){if(o===it||o.drape)continue;const q=posOf(o.id,sc);if(!q||q.a<.5)continue;const w0=baseZ(o,q,sc),w1=w0+o.h/100;if(Math.min(z1,w1)-Math.max(z0,w0)<=0.01)continue;if(it.type==='actor'&&o.stand&&w1-z0<=0.45)continue;const Bq=boxOf(o,q);if(boxHit(A,Bq))out.set(o.id,boxDepth(A,Bq))}
+ wallBoxes().forEach((B,i)=>{if((B.aud?z0<-0.05:z0<0.05)&&boxHit(A,B))out.set('__wall'+i,boxDepth(A,B))});return out}
 // まとめて動かしてみて、床の外・新しいぶつかりがあれば元に戻す。ch=[[id,x,y,r?],...]
 function tryMove(ch){
  const sc=scene(),ids=new Set(ch.map(c=>c[0])),old=ch.map(([id])=>{const q=posRef(id);return [id,q.x,q.y,q.r]});
@@ -443,25 +459,27 @@ function tryMove(ch){
  const before={};for(const [id] of ch){const mk=markOf(id);if(mk){before[id]={off:!onFloorPt(mk.x,mk.y)};continue}const it=item(id),p=sc.pos[id];if(!it||!p||!p.on){before[id]={skip:1};continue}before[id]={off:!onFloorItem(it,p),hits:hitsOf(id,sc)}}
  set(ch);let ok=true;
  for(const [id] of ch){const b=before[id];if(b.skip)continue;const mk=markOf(id);if(mk){if(!b.off&&!onFloorPt(mk.x,mk.y)){ok=false;break}continue}
-  const it=item(id),p=sc.pos[id];if(!b.off&&!onFloorItem(it,p)){ok=false;break}for(const h of hitsOf(id,sc)){if(ids.has(h))continue;if(!b.hits.has(h)){ok=false;break}}if(!ok)break}
+  const it=item(id),p=sc.pos[id];if(!b.off&&!onFloorItem(it,p)){ok=false;break}for(const [h,dp] of hitsOf(id,sc)){if(ids.has(h))continue;if(!b.hits.has(h)||dp>b.hits.get(h)+0.002){ok=false;break}}if(!ok)break}
  if(!ok)set(old);return ok}
 // 動かす。ぶつかったら、横だけ・前後だけでも動けないか試す（壁にそって滑る）
-function slideMove(ids,dx,dy){const P=ids.map(id=>[id,posRef(id)]).filter(([,q])=>q);if(!P.length)return false;
+function slideMove(ids,dx,dy){const n=physicsOn()?Math.max(1,Math.ceil(Math.hypot(dx,dy)/0.15)):1;if(n===1)return slideStep(ids,dx,dy);
+ let moved=false;for(let i=0;i<n;i++){const P=ids.map(id=>posRef(id)).filter(Boolean),x0=P.map(q=>q.x+','+q.y).join();const ok=slideStep(ids,dx/n,dy/n);moved=moved||ok;if(P.map(q=>q.x+','+q.y).join()===x0)break}return moved}
+function slideStep(ids,dx,dy){const P=ids.map(id=>[id,posRef(id)]).filter(([,q])=>q);if(!P.length)return false;
  const at=(fx,fy)=>tryMove(P.map(([id,q])=>[id,q.x+fx,q.y+fy]));
  if(at(dx,dy))return true;
  // ぶつかる手前まで寄せる（1cm単位まで詰める）
  const reach=(fx,fy)=>{if(Math.hypot(fx,fy)<0.005)return false;let lo=0,hi=1;for(let i=0;i<8;i++){const m=(lo+hi)/2,X=P.map(([id,q])=>[id,q.x+fx*m,q.y+fy*m]),ok=tryMove(X);if(ok){tryMove(X.map(([id,x,y])=>[id,x-fx*m,y-fy*m]));lo=m}else hi=m}
-  if(lo<0.02)return false;return at(Math.round(fx*lo*100)/100,Math.round(fy*lo*100)/100)||at(fx*lo,fy*lo)};
+  if(lo<0.02)return false;return at(Math.trunc(fx*lo*100)/100,Math.trunc(fy*lo*100)/100)||at(fx*lo*0.98,fy*lo*0.98)};
  const moved=reach(dx,dy);
  // 残りは壁にそって滑る
  const r1=Math.abs(dx)>1e-6&&at(dx,0),r2=!r1&&Math.abs(dy)>1e-6&&at(0,dy);if(r1||r2)return true;
  return reach(dx,0)||reach(0,dy)||moved}
 // 置いた場所がふさがっていたら、近くの空いている所へ
 function placeFree(id){if(!physicsOn())return;const it=item(id),p=scene().pos[id];if(!it||!p||!p.on||it.drape)return;const x0=p.x,y0=p.y;
- const ok=()=>onFloorItem(it,p)&&![...hitsOf(id,scene())].length;if(ok())return;
+ const ok=()=>onFloorItem(it,p)&&!hitsOf(id,scene()).size;if(ok())return;
  for(let r=0.25;r<=6;r+=0.25){const n=Math.max(8,Math.round(r*10));for(let i=0;i<n;i++){const a=i/n*Math.PI*2;p.x=+(x0+Math.cos(a)*r).toFixed(2);p.y=+(y0+Math.sin(a)*r).toFixed(2);if(ok())return}}p.x=x0;p.y=y0}
 let toastT=0;function toastOnce(t){const n=performance.now();if(n-toastT<1800)return;toastT=n;toast(t)}
-function baseZ(it,p,sc,depth){let z=(it.elev||0)/100;if(it.drape||(depth||0)>12)return z;
+function baseZ(it,p,sc,depth){let z=(it.elev||0)/100;if(it.drape||(depth||0)>12)return z;z+=floorZ(p.x,p.y);
  const lim=it.type==='actor'?doc.items.length:doc.items.indexOf(it);
  for(let i=0;i<lim;i++){const o=doc.items[i];if(o===it||o.type!=='object'||!o.stand||o.drape)continue;const q=posOf(o.id,sc);if(!q||q.a<.5)continue;
   if(it.type==='actor'?inFoot(o,q,p.x,p.y):footOverlap(it,p,o,q))z=Math.max(z,baseZ(o,q,sc,(depth||0)+1)+o.h/100)}return z}
@@ -491,11 +509,11 @@ function renderTo(c,w,h,vw,m,o){
  if(!(vw.k>0)||w<2||h<2)return;o=o||{};const T=doc.theater,sc=o.scene||scene(),k=vw.k;
  c.fillStyle='#0e1016';c.fillRect(0,0,w,h);
  const b=stageBounds();
- if(m!=='front'){c.save();if(m==='both'){c.beginPath();c.rect(0,vw.oy+DIV*k,w,h);c.clip()}drawPlan(c,w,h,vw,sc,o);c.restore()}
- if(m!=='plan'){c.save();if(m==='both'){c.beginPath();c.rect(0,0,w,vw.oy+DIV*k);c.clip()}drawFront(c,w,h,vw,sc,o);c.restore()}
- if(m==='both'){const y=vw.oy+DIV*k;c.strokeStyle='#2e3342';c.lineWidth=1;c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke()}
+ if(m!=='front'){c.save();if(m==='both'){c.beginPath();c.rect(0,vw.oy+DIVV()*k,w,h);c.clip()}drawPlan(c,w,h,vw,sc,o);c.restore()}
+ if(m!=='plan'){c.save();if(m==='both'){c.beginPath();c.rect(0,0,w,vw.oy+DIVV()*k);c.clip()}drawFront(c,w,h,vw,sc,o);c.restore()}
+ if(m==='both'){const y=vw.oy+DIVV()*k;c.strokeStyle='#2e3342';c.lineWidth=1;c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke()}
  if(o.ui!==false){c.font='600 11px sans-serif';c.fillStyle='#8a90a2';c.textAlign='left';c.textBaseline='top';
-  if(m!=='plan')c.fillText('正面図（客席から）',10,8);if(m!=='front')c.fillText('平面図（真上から）',10,m==='both'?vw.oy+DIV*k+8:8)}
+  if(m!=='plan')c.fillText('正面図（客席から）',10,8);if(m!=='front')c.fillText('平面図（真上から）',10,m==='both'?vw.oy+DIVV()*k+8:8)}
 }
 function gridLines(c,vw,x0,x1,y0,y1,toS,step){c.beginPath();
  for(let x=Math.ceil(x0/step)*step;x<=x1+1e-6;x+=step){for(const s of [1,-1]){}const [a,b1]=toS(x,y0),[,b2]=toS(x,y1);c.moveTo(a,b1);c.lineTo(a,b2)}
@@ -508,8 +526,9 @@ function drawPlan(c,w,h,vw,sc,o){
  const T=doc.theater,k=vw.k,b=stageBounds(),P=(x,y)=>pS(vw,x,y);
  const hw=T.width/2;
  // 客席
- let [x0,y0]=P(b.x0,0),[x1,y1]=P(b.x1,-2.2);c.fillStyle='#151821';c.fillRect(x0,y0,x1-x0,y1-y0);
- c.fillStyle='#3a4050';c.font='12px sans-serif';c.textAlign='center';c.textBaseline='middle';const [cx,cy]=P(0,-1.3);c.fillText('客　席',cx,cy);
+ const AL=audLayout(T);let [x0,y0]=P(b.x0,0),[x1,y1]=P(b.x1,-AL.end);c.fillStyle='#151821';c.fillRect(x0,y0,x1-x0,y1-y0);
+ {c.fillStyle='rgba(120,128,150,.35)';const cw=0.42*k,cd=0.4*k;for(let r=0;r<AL.rows;r++){const yy=-(2.1+r*0.95);for(const x of AL.xs){const [cx,cy]=P(x,yy);c.fillRect(cx-cw/2,cy-cd/2,cw,cd)}}}
+ c.fillStyle='#3a4050';c.font='12px sans-serif';c.textAlign='center';c.textBaseline='middle';const [cx,cy]=P(0,-1.05);c.fillText('客　席',cx,cy);
  // 袖
  c.fillStyle='#181b24';for(const s of [-1,1]){const [a,bb]=P(s<0?b.x0:hw,T.depth),[a2,bb2]=P(s<0?-hw:b.x1,0);c.fillRect(a,bb,a2-a,bb2-bb)}
  // 舞台面
@@ -632,6 +651,8 @@ function drawFront(c,w,h,vw,sc,o){
  c.fillStyle='#14171f';for(const s of [-1,1]){const [x0,y0]=F(s<0?b.x0:hw,T.height+0.6),[x1,y1]=F(s<0?-hw:b.x1,0);c.fillRect(x0,y0,x1-x0,y1-y0)}
  // マス目
  c.lineWidth=1;c.strokeStyle='rgba(255,255,255,.06)';symGrid(c,vw,b.x0,b.x1,0,T.height+0.6,F,T.grid);
+ // 客席の床（舞台より低い）と舞台の前の面
+ {const sh=SH(),[qa,qb]=F(b.x0,0),[qa2,qb2]=F(b.x1,-sh);c.fillStyle='#16181f';c.fillRect(qa,qb,qa2-qa,qb2-qb);c.strokeStyle='#5a6070';c.lineWidth=1;c.beginPath();c.moveTo(qa,qb2);c.lineTo(qa2,qb2);c.stroke();c.fillStyle='#5a6070';c.font='10px sans-serif';c.textAlign='left';c.textBaseline='bottom';c.fillText('客席の床',qa+4,qb2-2)}
  // 床
  [a,bb]=F(b.x0,0);[a2]=F(b.x1,0);c.fillStyle='#2a2f3e';c.fillRect(a,bb,a2-a,Math.max(3,0.15*k));c.strokeStyle='#8a90a2';c.lineWidth=1.5;c.beginPath();c.moveTo(a,bb);c.lineTo(a2,bb);c.stroke();
  // 額縁
@@ -699,7 +720,7 @@ function drawPerson(c,vw,it,p,z0,dim,isSel){
 }
 
 /* ---------- 当たり判定 ---------- */
-function regionAt(sy){if(mode==='plan')return 'plan';if(mode==='front')return 'front';return sy>V.oy+DIV*V.k?'plan':'front'}
+function regionAt(sy){if(mode==='plan')return 'plan';if(mode==='front')return 'front';return sy>V.oy+DIVV()*V.k?'plan':'front'}
 function hitItem(sx,sy){if(viewOnly)return null;
  const reg=regionAt(sy),sc=scene();
  const its=doc.items.map(it=>({it,p:posOf(it.id,sc)})).filter(e=>e.p&&e.p.a>.5);
@@ -1200,7 +1221,7 @@ if(navigator.share&&navigator.canShare){const b=document.createElement('button')
 
 /* ---------- 3D（WebGL・外部部品なし） ---------- */
 // GL座標: X=x(上手+)、Y=高さ、Z=-y（客席側が+Z）
-const glc=$('#gl');let gl=null,G3=null,spots=true;
+const glc=$('#gl');let gl=null,G3=null,spots=true,wash=true;
 const M4={
  id:()=>[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
  mul(a,b){const o=new Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++){let s=0;for(let k=0;k<4;k++)s+=a[k*4+r]*b[c*4+k];o[c*4+r]=s}return o},
@@ -1235,16 +1256,26 @@ function initGL(){
  if(gl)return true;
  try{gl=glc.getContext('webgl',{antialias:true,preserveDrawingBuffer:true,alpha:false})}catch(e){gl=null}
  if(!gl){log('3D表示が使えません（WebGLなし）');return false}
- const vs0=0;const vs=`attribute vec3 p;attribute vec3 n;attribute vec2 uv;uniform mat4 M,VP;varying vec3 vn;varying vec2 vuv;
- void main(){vn=mat3(M)*n;vuv=uv;gl_Position=VP*M*vec4(p,1.);}`;
- const fs=`precision mediump float;varying vec3 vn;varying vec2 vuv;uniform vec4 col;uniform float lit,useTex;uniform sampler2D tex;
+ const vs=`attribute vec3 p;attribute vec3 n;attribute vec2 uv;uniform mat4 M,VP;varying vec3 vn;varying vec2 vuv;varying vec3 vw;
+ void main(){vn=mat3(M)*n;vuv=uv;vec4 w=M*vec4(p,1.);vw=w.xyz;gl_Position=VP*w;}`;
+ // 照明：地明かり（客席の上から舞台を照らす）＋ピンスポット。舞台の外（袖・客席）は暗くなる
+ const fs=`precision highp float;varying vec3 vn;varying vec2 vuv;varying vec3 vw;uniform vec4 col;uniform float lit,useTex;uniform sampler2D tex;
+ uniform vec4 stg;uniform vec4 sp[8];uniform int nsp;
  void main(){vec4 c=col;if(useTex>.5){c=texture2D(tex,vuv);c.a*=col.a;}
- if(lit>.5){vec3 N=normalize(vn);if(!gl_FrontFacing)N=-N;float d=max(dot(N,normalize(vec3(.35,.85,.55))),0.);float d2=max(dot(N,normalize(vec3(-.5,.4,.3))),0.);float up=max(N.y,0.);
- c.rgb*= .30+.62*d+.18*d2+.08*up;}gl_FragColor=c;}`;
+ if(lit>.5){vec3 N=normalize(vn);if(!gl_FrontFacing)N=-N;
+  float key=max(dot(N,normalize(vec3(0.,.6,.8))),0.);
+  float sl=max(dot(N,normalize(vec3(-.7,.45,.35))),0.),sr=max(dot(N,normalize(vec3(.7,.45,.35))),0.);
+  float top=max(N.y,0.);
+  float ox=max(abs(vw.x)-stg.x,0.),oz=max(max(vw.z-.6,-vw.z-stg.y),0.);
+  float area=1.-smoothstep(0.,2.2,length(vec2(ox,oz)))*.8;
+  float lv=.14+stg.w*area*(.72*key+.2*(sl+sr)+.12*top);
+  for(int i=0;i<8;i++){if(i>=nsp)break;vec3 L=sp[i].xyz-vw;float dl=length(L);vec3 Ld=L/dl;float ca=dot(-Ld,vec3(0.,-1.,0.));float cone=smoothstep(sp[i].w,sp[i].w+.03,ca);lv+=cone*(.3+.8*max(dot(N,Ld),0.));}
+  c.rgb*=min(lv,1.6);}
+ gl_FragColor=c;}`;
  const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o};
  const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
  const L=n=>gl.getAttribLocation(pr,n),U=n=>gl.getUniformLocation(pr,n);
- G3={pr,a:{p:L('p'),n:L('n'),uv:L('uv')},u:{M:U('M'),VP:U('VP'),col:U('col'),lit:U('lit'),useTex:U('useTex'),tex:U('tex')},m:{},tex:null,texSrc:null,lines:null,linesKey:'',floor:null,floorKey:''};
+ G3={pr,a:{p:L('p'),n:L('n'),uv:L('uv')},u:{M:U('M'),VP:U('VP'),col:U('col'),lit:U('lit'),useTex:U('useTex'),tex:U('tex'),stg:U('stg'),sp:U('sp[0]'),nsp:U('nsp')},m:{},tex:null,texSrc:null,lines:null,linesKey:'',floor:null,floorKey:''};
  const m=G3.m;m.box=mkBox();m.cyl=mkCyl(28,1);m.cone=mkCyl(28,0.06,true);m.sph=mkSph(18,12);m.disk=mkDisk(40);m.quad=mkQuad();
  gl.enable(gl.DEPTH_TEST);log('3D表示を準備');return true}
 function mkMesh(p,n,uv,idx){const b=a=>{const o=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,o);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(a),gl.STATIC_DRAW);return o};
@@ -1290,8 +1321,7 @@ function boxInto(P,N,I,x0,y0,z0,x1,y1,z1){const F=[[[1,0,0],[0,0,-1],[0,1,0]],[[
  for(const [n,u,v] of F){const b=P.length/3;for(const [a,c] of [[-1,-1],[1,-1],[1,1],[-1,1]]){P.push(cx+(n[0]+u[0]*a+v[0]*c)*sx,cy+(n[1]+u[1]*a+v[1]*c)*sy,cz+(n[2]+u[2]*a+v[2]*c)*sz);N.push(...n)}I.push(b,b+1,b+2,b,b+2,b+3)}}
 let AUD=null;
 function audMesh(T){const sh=T.stageH??0.9,key=T.width+'|'+sh;if(AUD&&AUD.key===key)return AUD;
- const S={P:[],N:[],I:[]},Fm={P:[],N:[],I:[]},hw=T.width/2+1,xs=[];for(let x=-hw+0.26;x<=hw-0.26;x+=0.52)if(Math.abs(x)>0.6)xs.push(x);
- const rows=Math.max(3,Math.min(12,Math.floor(440/Math.max(1,xs.length))));
+ const S={P:[],N:[],I:[]},Fm={P:[],N:[],I:[]},{xs,rows}=audLayout(T);
  for(let r=0;r<rows;r++){const z=2.1+r*0.95,y=-sh;for(const x of xs){const t=0.02;
   boxInto(S.P,S.N,S.I,x-0.21,y+0.41,z-0.2,x+0.21,y+0.44,z+0.18);boxInto(S.P,S.N,S.I,x-0.2,y+0.55,z+0.19,x+0.2,y+0.78,z+0.22);
   for(const sx of [-1,1]){const lx=x+sx*0.2;boxInto(Fm.P,Fm.N,Fm.I,lx-t/2,y,z-0.19,lx+t/2,y+0.43,z-0.17);boxInto(Fm.P,Fm.N,Fm.I,lx-t/2,y,z+0.2,lx+t/2,y+0.8,z+0.22)}}}
@@ -1349,6 +1379,8 @@ function draw3d(){
  gl.viewport(0,0,W,H);gl.clearColor(.043,.047,.07,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
  const T=doc.theater,sh=T.stageH??0.9,eye=camEye(),VP=M4.mul(M4.persp(cam.fov,W/H,0.2,300),M4.look(eye,[cam.tx,cam.ty,cam.tz],[0,1,0]));G3.VP=VP;G3.eye=eye;
  gl.uniformMatrix4fv(G3.u.VP,false,VP);gl.disable(gl.BLEND);gl.depthMask(true);
+ {const sc0=scene(),arr=new Float32Array(32);let n=0;if(spots)for(const it of doc.items){if(n>=8)break;if(it.type!=='actor'||it.kuroko)continue;const p=posOf(it.id,sc0);if(!p||p.a<.3)continue;const z0=baseZ(it,p,sc0),top=T.height+1,ang=Math.atan(0.85/Math.max(0.5,top-z0));arr.set([p.x,top,-p.y,Math.cos(ang)],n*4);n++}
+  gl.uniform4f(G3.u.stg,T.width/2,T.depth,T.stageH??0.9,wash?1:0);gl.uniform4fv(G3.u.sp,arr);gl.uniform1i(G3.u.nsp,n)}
  const hw=T.width/2,b=stageBounds(),xl=b.x0,xr=b.x1;
  // 舞台（袖ふくむ）と前面
  dm(G3.m.box,BX(xl,-sh,-b.y0+0,xr,-0.001,-(T.depth+0.3)),'#2b2522');
@@ -1414,7 +1446,7 @@ function draw3d(){
  // ピンスポット
  if(spots){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);
   for(const {it,p} of its){if(it.type!=='actor'||it.kuroko)continue;const z0=baseZ(it,p,sc),R=0.85,hT=T.height+1-z0;
-   dm(G3.m.disk,chain(M4.t(p.x,z0+0.01,-p.y),M4.s(R*2,1,R*2)),[1,.86,.6],{a:0.28*p.a,lit:false});
+   dm(G3.m.disk,chain(M4.t(p.x,z0+0.01,-p.y),M4.s(R*2,1,R*2)),[1,.86,.6],{a:0.1*p.a,lit:false});
    gl.disable(gl.CULL_FACE);dm(G3.m.cone,chain(M4.t(p.x,z0,-p.y),M4.s(R*2,hT,R*2)),[1,.9,.7],{a:0.07*p.a,lit:false})}
   gl.depthMask(true);gl.disable(gl.BLEND)}
  // 名前（2Dで上に重ねる）
@@ -1470,6 +1502,7 @@ function up3(){if(guides.x!==null||guides.y!==null){clearGuides();setTimeout(dra
 cv.addEventListener('contextmenu',e=>{if(mode==='3d')e.preventDefault()});
 $$('#cam3d [data-cam]').forEach(b=>b.onclick=()=>camPreset(b.dataset.cam));
 $('#camSel').onchange=e=>{const v=e.target.value;e.target.value='';e.target.blur();if(v)camPreset(v)};
+$('#bWash').onclick=()=>{wash=!wash;$('#bWash').classList.toggle('on',wash);draw()};
 $('#bSpot').onclick=()=>{spots=!spots;$('#bSpot').classList.toggle('on',spots);draw()};
 
 /* ---------- 共有 ---------- */
