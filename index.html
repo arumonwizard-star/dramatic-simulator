@@ -265,7 +265,7 @@ body.view #present{display:block}
 
 <script>
 'use strict';
-const VER='1.8.0';
+const VER='1.8.1';
 // iPhoneのSafari（ホーム画面から開いたとき以外）は画面の上をぼかすので、その分ボタンを下げる
 (()=>{const ios=/iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),sa=navigator.standalone||matchMedia('(display-mode: standalone)').matches;if(ios&&!sa)document.documentElement.classList.add('iosweb')})();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -286,7 +286,8 @@ const f2=v=>(Math.round(v*100)/100).toFixed(2);
 
 /* ---------- データ ---------- */
 const PRESETS=[
- ['平台 3×6尺',182,91,40,'#9a8466',1],['平台 4×8尺',242,121,40,'#9a8466',1],['箱馬',36,21,18,'#8a7458',1],
+ ['平台 3×6尺（サブロク）',181.8,90.9,12.1,'#9a8466',1],['平台 4×6尺（シロク）',181.8,121.2,12.1,'#9a8466',1],['平台 6×6尺（ロクロク）',181.8,181.8,12.1,'#9a8466',1],['平台 2×6尺（ニロク）',181.8,60.6,12.1,'#9a8466',1],['平台 3×3尺',90.9,90.9,12.1,'#9a8466',1],
+ ['箱馬 高さ6寸（寝かせ）',51.5,30.3,18.2,'#8a7458',1],['箱馬 高さ1尺（横置き）',51.5,18.2,30.3,'#8a7458',1],['箱馬 高さ1尺7寸（縦置き）',30.3,18.2,51.5,'#8a7458',1],['箱馬 1尺角（高さ6寸）',30.3,30.3,18.2,'#8a7458',1],
  ['階段 3段',91,90,60,'#8d7a60',1],['パイプ椅子',45,47,78,'#4a5060',0,'chair'],['パイプ椅子 5脚（横1列）',250,47,78,'#4a5060',0,'chairrow'],['テーブル',120,75,72,'#a0764f',0],
  ['ソファ',180,85,80,'#6f7fa8',0],['ベッド',200,100,50,'#7f8fb0',1],['パネル 3×9尺',91,8,273,'#77808f',0],['パネル 6×9尺',182,8,273,'#77808f',0],
  ['ドア枠',100,15,210,'#8f7c6a',0],['マイクスタンド',30,30,150,'#555c6a',0],['箱 45cm',45,45,45,'#a08a60',1],['自由な大きさ',100,100,100,'#888fa0',0]];
@@ -307,9 +308,9 @@ const ACOL=['#e8735a','#5aa0e8','#e8c45a','#6fd08c','#c27ae8','#e87aa8','#5ad0d0
 function newDoc(){
  const a={id:uid(),type:'actor',name:'役者A',color:ACOL[0],h:170,w:45,d:28,elev:0};
  const b={id:uid(),type:'actor',name:'役者B',color:ACOL[1],h:158,w:42,d:26,elev:0};
- const p={id:uid(),type:'object',name:'平台',color:'#9a8466',w:182,d:91,h:40,elev:0,shape:'rect',stand:true};
+ const p={id:uid(),type:'object',name:'平台',color:'#9a8466',w:181.8,d:90.9,h:12.1,elev:0,shape:'rect',stand:true};
  const c={id:uid(),type:'object',name:'パイプ椅子',color:'#4a5060',w:45,d:47,h:78,elev:0,shape:'chair',stand:false};
- return {v:1,marks:[],theater:{name:'劇場',width:10,depth:8,height:6,wing:3,grid:1,outline:null,ul:null,tsura:1,tsuraBack:false,don:{on:true,color:'#7a1622'}},
+ return {v:2,marks:[],theater:{name:'劇場',width:10,depth:8,height:6,wing:3,grid:1,outline:null,ul:null,tsura:1,tsuraBack:false,don:{on:true,color:'#7a1622'}},
   items:[a,b,p,c],
   scenes:[{id:uid(),title:'シーン1',note:'',dur:1.2,pos:{[a.id]:{x:-1.5,y:2,r:0,on:true},[b.id]:{x:1.2,y:2.5,r:-20,on:true},[p.id]:{x:0,y:5,r:0,on:true},[c.id]:{x:2.5,y:4,r:30,on:true}}}],
   cur:0};
@@ -323,7 +324,11 @@ const scene=()=>doc.scenes[doc.cur];
 const item=id=>doc.items.find(i=>i.id===id);
 const markOf=id=>(doc.marks||[]).find(m=>m.id===id);
 function posRef(id){return markOf(id)||scene().pos[id]}
-function fixDoc(d){d.marks=d.marks||[];const T=d.theater;if(!T.don)T.don={on:true,color:'#7a1622'};if(T.tsura===undefined)T.tsura=1;if(T.tsuraBack===undefined)T.tsuraBack=false;return d}
+function fixDoc(d){d.marks=d.marks||[];
+ if(!(d.v>=2)){for(const it of d.items||[]){if(it.type!=='object'||it.drape)continue;
+  if(it.w===182&&it.d===91&&it.h===40){it.w=181.8;it.d=90.9;it.h=12.1}
+  else if(it.w===242&&it.d===121&&it.h===40){it.w=242.4;it.d=121.2;it.h=12.1}
+  else if(it.w===36&&it.d===21&&it.h===18){it.w=51.5;it.d=30.3;it.h=18.2}}d.v=2}const T=d.theater;if(!T.don)T.don={on:true,color:'#7a1622'};if(T.tsura===undefined)T.tsura=1;if(T.tsuraBack===undefined)T.tsuraBack=false;return d}
 let showMarks=true;let viewOnly=false;
 let selSet=new Set(),multiMode=false;
 let guides={x:null,y:null,lx:'',ly:''};
@@ -408,8 +413,13 @@ function loop(){if(looping)return;looping=true;const f=()=>{draw();if(anim&&perf
 // 役者が台の上にいるときの高さ
 function inFoot(o,p,x,y){const dx=x-p.x,dy=y-p.y,a=p.r*Math.PI/180;const lx=dx*Math.cos(a)-dy*Math.sin(a),ly=dx*Math.sin(a)+dy*Math.cos(a);// 画面回転と合わせる
  return Math.abs(lx)<=o.w/200&&Math.abs(ly)<=o.d/200}
-function baseZ(it,p,sc){let z=(it.elev||0)/100;if(it.type!=='actor')return z;
- for(const o of doc.items){if(o.type!=='object'||!o.stand)continue;const q=posOf(o.id,sc);if(!q||q.a<.5)continue;if(inFoot(o,q,p.x,p.y))z=Math.max(z,((o.elev||0)+o.h)/100)}return z}
+// 床に置いた形（四角）の角と中心
+function footPts(it,p){const a=p.r*Math.PI/180,c=Math.cos(a),s=Math.sin(a),hw=it.w/200*0.92,hd=it.d/200*0.92;return [[0,0],[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([x,y])=>[p.x+x*c+y*s,p.y-x*s+y*c])}
+function footOverlap(a,pa,b,pb){return footPts(a,pa).some(([x,y])=>inFoot(b,pb,x,y))||footPts(b,pb).some(([x,y])=>inFoot(a,pa,x,y))}
+function baseZ(it,p,sc,depth){let z=(it.elev||0)/100;if(it.drape||(depth||0)>12)return z;
+ const lim=it.type==='actor'?doc.items.length:doc.items.indexOf(it);
+ for(let i=0;i<lim;i++){const o=doc.items[i];if(o===it||o.type!=='object'||!o.stand||o.drape)continue;const q=posOf(o.id,sc);if(!q||q.a<.5)continue;
+  if(it.type==='actor'?inFoot(o,q,p.x,p.y):footOverlap(it,p,o,q))z=Math.max(z,baseZ(o,q,sc,(depth||0)+1)+o.h/100)}return z}
 const isChair=it=>it.shape==='chair'||it.shape==='chairrow';
 function chairXs(it){const n=it.shape==='chairrow'?Math.max(1,Math.round(it.w/50)):1,cw=it.w/100/n;return {n,cw,xs:Array.from({length:n},(_,i)=>-it.w/200+cw*(i+0.5))}}
 const projW=(it,r)=>{const a=r*Math.PI/180;return Math.abs(it.w*Math.cos(a))+Math.abs(it.d*Math.sin(a))};
@@ -486,7 +496,7 @@ function drawPlan(c,w,h,vw,sc,o){
  for(const m of allMarks())drawMarkPlan(c,vw,m,oS(o,m.id));
  // もの
  const its=doc.items.map(it=>({it,p:posOf(it.id,sc)})).filter(e=>e.p);
- its.sort((a,b2)=>(a.it.type==='actor')-(b2.it.type==='actor')||((a.p.elev||0)-(b2.p.elev||0)));
+ for(const e of its)e.z=baseZ(e.it,e.p,sc);its.sort((a,b2)=>(a.it.type==='actor')-(b2.it.type==='actor')||(a.z-b2.z)||(doc.items.indexOf(a.it)-doc.items.indexOf(b2.it)));
  for(const {it,p} of its)drawItemPlan(c,vw,it,p,oS(o,it.id),o);
  // 選択中の寸法
  const sp=o.sel&&!isMulti()&&its.find(e=>e.it.id===o.sel);
@@ -839,8 +849,10 @@ function renderProps(){
   <h3 style="margin-top:12px">このシーンでの位置</h3>
   <div class="grp"><button id="pOn" class="${on?'on':''}">${on?'舞台に出ている':'裏にいる（押すと出す）'}</button></div>
   ${on?field('左右','px',f2(p.x),'m','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">センター0、上手が＋、下手が－</div>'+(doc.theater.tsura?'<div class="note" style="margin-top:-4px;color:#ffd27a">いま <span id="posNow">'+esc(posLabel(p.x))+'</span></div>':'')+field('前後','py',f2(p.y),'m','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">舞台のツラから奥へ</div>'+field('向き','pr',p.r,'°','inputmode="decimal"')+'<div class="note" style="margin-top:-4px">0＝客席向き。平面図の青い丸をドラッグでも回せます</div><div class="grp"><button id="pCenter">センターへ</button><button id="pAll">この位置を後のシーンにも</button></div>':''}
+  ${!A&&!it.drape?'<div class="grp" style="margin-top:10px"><button id="pUp">上の段へ</button><button id="pDown">下の段へ</button></div><div class="note" style="margin-top:-4px">「乗れる」物どうしを重ねたとき、どちらが上に乗るかを入れ替えます（後から置いた物が上）</div>':''}
   <div class="grp" style="margin-top:14px"><button id="pDup">複製</button><button id="pDel" class="warn">削除（全シーン）</button></div>`;
   $('#pOn').onclick=()=>setOn(it.id,!on);
+  if($('#pUp')){$('#pUp').onclick=()=>change(()=>{const i=doc.items.indexOf(it);doc.items.splice(i,1);doc.items.push(it)});$('#pDown').onclick=()=>change(()=>{const i=doc.items.indexOf(it);doc.items.splice(i,1);doc.items.unshift(it)})}
   $$('#props [data-col]').forEach(b=>b.onclick=()=>change(()=>{it.color=b.dataset.col}));
   if($('#dClose')){$('#dClose').onclick=()=>change(()=>{scene().pos[it.id].open=0});$('#dOpen').onclick=()=>change(()=>{scene().pos[it.id].open=1})}
   if(on){$('#pCenter').onclick=()=>change(()=>{scene().pos[it.id].x=0});
