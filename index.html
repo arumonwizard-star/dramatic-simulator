@@ -114,6 +114,7 @@ body.view #present{display:block}
 }
 @media (max-width:900px){
  html.iosweb #app{padding-top:calc(env(safe-area-inset-top) + 34px)}
+ html.iosapp #app{padding-top:calc(max(env(safe-area-inset-top),50px) + 30px)}
  #app{grid-template-rows:auto 1fr auto}
  header{flex-wrap:wrap;overflow:visible;row-gap:6px;padding:6px 8px;height:auto}
  header button{padding:6px 8px;font-size:13px;min-height:34px}
@@ -194,6 +195,15 @@ body.view #present{display:block}
  <div class="row"><label>高さ</label><input type="text" inputmode="decimal" id="tH"><span class="u">m</span></div>
  <div class="row"><label>舞台の高さ</label><input type="text" inputmode="decimal" id="tSH"><span class="u">m</span></div>
  <div class="row"><label>袖の幅</label><input type="text" inputmode="decimal" id="tWing"><span class="u">m</span></div>
+ <h3 style="margin-top:14px">客席</h3>
+ <div class="row"><label>客席</label><input type="checkbox" id="aOn"><span class="note" style="margin:0">客席（パイプ椅子）を出す</span><span id="aTotal" style="margin-left:auto;color:var(--ok);font-weight:700"></span></div>
+ <div class="row"><label>列の数</label><input type="text" inputmode="numeric" id="aRows"><span class="u">列</span></div>
+ <div class="row"><label>1列の席数</label><input type="text" inputmode="numeric" id="aSeats" placeholder="自動"><span class="u">席</span></div>
+ <div class="row"><label>通路</label><select id="aAisle"><option value="center">真ん中に1本</option><option value="two">左右に2本</option><option value="none">なし</option></select></div>
+ <div class="row"><label>最前列まで</label><input type="text" inputmode="decimal" id="aFront"><span class="u">m</span></div>
+ <div class="note" style="margin-top:-4px">ツラから最前列のいすの中心まで</div>
+ <div class="row"><label>段床</label><input type="checkbox" id="aRake"><span class="note" style="margin:0">後ろの列ほど高くする</span></div>
+ <div class="row"><label>段の高さ</label><input type="text" inputmode="decimal" id="aRise"><span class="u">cm</span></div>
  <div class="row"><label>ぶつかり</label><input type="checkbox" id="tPhys"><span class="note" style="margin:0">床の外に出ない・壁や物を通り抜けない</span></div>
  <div class="row"><label>額縁</label><input type="checkbox" id="tArch"><span class="note" style="margin:0">プロセニアムアーチを出す</span></div>
  <div class="row"><label>緞帳</label><input type="checkbox" id="tDon"><span class="note" style="margin:0">緞帳がある劇場</span><input type="color" id="tDonC" style="margin-left:auto"></div>
@@ -266,9 +276,9 @@ body.view #present{display:block}
 
 <script>
 'use strict';
-const VER='1.9.1';
-// iPhoneのSafari（ホーム画面から開いたとき以外）は画面の上をぼかすので、その分ボタンを下げる
-(()=>{const ios=/iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),sa=navigator.standalone||matchMedia('(display-mode: standalone)').matches;if(ios&&!sa)document.documentElement.classList.add('iosweb')})();
+const VER='1.10.0';
+// iPhoneは画面の上（時計の下）をぼかすので、その分ボタンを下げる（Safariでもホーム画面のアプリでも）
+(()=>{const ios=/iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),sa=navigator.standalone||matchMedia('(display-mode: standalone)').matches;if(ios)document.documentElement.classList.add('iosweb');if(ios&&sa)document.documentElement.classList.add('iosapp')})();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -423,15 +433,32 @@ const physicsOn=()=>doc.theater.physics!==false;
 function inPoly(poly,x,y){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [xi,yi]=poly[i],[xj,yj]=poly[j];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))c=!c}return c}
 // その点に舞台の床（舞台面か袖）があるか
 // 客席の並び：xs=椅子の左右位置、rows=列数、列の中心は ツラから 2.1+r*0.95 m 手前
-function audLayout(T){T=T||doc.theater;const hw=T.width/2+1,xs=[];for(let x=-hw+0.26;x<=hw-0.26;x+=0.52)if(Math.abs(x)>0.6)xs.push(x);
- const rows=Math.max(3,Math.min(12,Math.floor(440/Math.max(1,xs.length))));return {hw,xs,rows,end:2.1+(rows-1)*0.95+0.9}}
+// 客席の設定：T.aud={on,rows,seats(0=自動),aisle:'center'|'two'|'none',front(m),rake(段床),rise(cm)}
+const SEATW=0.52,ROWP=0.95;
+function audCfg(T){T=T||doc.theater;const a=T.aud||{};return {on:a.on!==false,rows:clamp(a.rows||12,1,60),seats:a.seats||0,aisle:a.aisle||'center',front:a.front??2.1,rake:!!a.rake,rise:(a.rise??15)/100}}
+let AUDL=null;
+function audLayout(T){T=T||doc.theater;const c=audCfg(T),key=JSON.stringify([c,T.width]);if(AUDL&&AUDL.key===key)return AUDL.v;
+ const aw=c.aisle==='none'?0:c.aisle==='two'?1.0:1.2;
+ let n=c.seats||Math.max(2,Math.floor((T.width+2-(c.aisle==='two'?2*aw:aw))/SEATW));n=clamp(n,1,80);
+ const blocks=[];// 席のかたまり（通路で分かれる）
+ const mk=(cnt,cx)=>{if(cnt<1)return;const w=cnt*SEATW,xs=[];for(let i=0;i<cnt;i++)xs.push(+(cx-w/2+SEATW*(i+0.5)).toFixed(3));blocks.push({x0:cx-w/2,x1:cx+w/2,xs})};
+ if(c.aisle==='none')mk(n,0);
+ else if(c.aisle==='center'){const l=Math.ceil(n/2),r=n-l;mk(l,-aw/2-l*SEATW/2);mk(r,aw/2+r*SEATW/2)}
+ else{const side=Math.round(n*0.25),mid=n-2*side,wm=mid*SEATW;mk(mid,0);mk(side,-wm/2-aw-side*SEATW/2);mk(side,wm/2+aw+side*SEATW/2)}
+ const xs=blocks.flatMap(b=>b.xs),ext=Math.max(...blocks.map(b=>Math.max(-b.x0,b.x1)),T.width/2);
+ const v={on:c.on,hw:ext+0.6,xs,blocks,rows:c.on?c.rows:0,front:c.front,rake:c.rake,rise:c.rise,total:c.on?xs.length*c.rows:0,
+  rowD:r=>c.front+r*ROWP, // 列の中心（ツラから何m手前）
+  end:c.on?c.front+(c.rows-1)*ROWP+0.9:1.5};
+ AUDL={key,v};return v}
+// 客席の床の高さ（段床なら後ろの列ほど高い）
+function audFloorAt(y){const A=audLayout(),sh=SH();if(!A.rake||!A.rows)return -sh;const r=Math.floor((-y-(A.front-ROWP/2))/ROWP);return r<0?-sh:-sh+(Math.min(r,A.rows-1)+1)*A.rise}
 function onStageFloor(x,y){const T=doc.theater,hw=T.width/2,e=0.002;
  if(Math.abs(x)>=hw-e&&Math.abs(x)<=hw+T.wing+e&&y>=-e&&y<=T.depth+e)return true;
  if(T.outline&&T.outline.length>2)return inPoly(T.outline,x,y);
  return Math.abs(x)<=hw+e&&y>=-e&&y<=T.depth+e}
 function inAudience(x,y){const A=audLayout();return y<0&&y>=-A.end&&Math.abs(x)<=A.hw+0.3}
 // その場所の床の高さ（舞台=0、客席=舞台の高さぶん低い）
-function floorZ(x,y){return onStageFloor(x,y)?0:inAudience(x,y)?-SH():0}
+function floorZ(x,y){return onStageFloor(x,y)?0:inAudience(x,y)?audFloorAt(y):0}
 function onFloorPt(x,y){return onStageFloor(x,y)||inAudience(x,y)}
 function onFloorPtOld(x,y){const T=doc.theater,hw=T.width/2,e=0.002;
  if(Math.abs(x)>=hw-e&&Math.abs(x)<=hw+T.wing+e&&y>=-e&&y<=T.depth+e)return true;
@@ -444,13 +471,13 @@ function boxHit(A,B){for(const ax of [A.u,A.v,B.u,B.v]){const pr=X=>Math.abs(X.h
 function boxDepth(A,B){let m=1e9;for(const ax of [A.u,A.v,B.u,B.v]){const pr=X=>Math.abs(X.hw*(X.u[0]*ax[0]+X.u[1]*ax[1]))+Math.abs(X.hd*(X.v[0]*ax[0]+X.v[1]*ax[1]));m=Math.min(m,pr(A)+pr(B)-Math.abs((B.cx-A.cx)*ax[0]+(B.cy-A.cy)*ax[1]))}return m}
 // 動かない壁（額縁の柱）
 function wallBoxes(){const T=doc.theater,hw=T.width/2,out=[];if(T.arch!==false)for(const s of [-1,1])out.push({cx:s*(hw+0.6),cy:-0.05,u:[1,0],v:[0,1],hw:0.6,hd:0.2});
- const A=audLayout(T),L=A.xs.filter(x=>x<0),Rr=A.xs.filter(x=>x>0);
- for(let r=0;r<A.rows;r++){const y=-(2.1+r*0.95+0.01);for(const g of [L,Rr]){if(!g.length)continue;const x0=Math.min(...g)-0.21,x1=Math.max(...g)+0.21;out.push({cx:(x0+x1)/2,cy:y,u:[1,0],v:[0,1],hw:(x1-x0)/2,hd:0.21,aud:true})}}
+ const A=audLayout(T);
+ for(let r=0;r<A.rows;r++){const y=-(A.rowD(r)+0.01);for(const g of A.blocks){const x0=g.x0+0.05,x1=g.x1-0.05;out.push({cx:(x0+x1)/2,cy:y,u:[1,0],v:[0,1],hw:(x1-x0)/2,hd:0.21,aud:true})}}
  return out}
 // その物がいまぶつかっている相手（高さが重なっているものだけ。上に乗っているのはぶつかりではない）
 function hitsOf(id,sc){const it=item(id),out=new Map();if(!it||it.drape)return out;const p=posOf(id,sc);if(!p)return out;const A=boxOf(it,p),z0=baseZ(it,p,sc),z1=z0+it.h/100;
  for(const o of doc.items){if(o===it||o.drape)continue;const q=posOf(o.id,sc);if(!q||q.a<.5)continue;const w0=baseZ(o,q,sc),w1=w0+o.h/100;if(Math.min(z1,w1)-Math.max(z0,w0)<=0.01)continue;if(it.type==='actor'&&o.stand&&w1-z0<=0.45)continue;const Bq=boxOf(o,q);if(boxHit(A,Bq))out.set(o.id,boxDepth(A,Bq))}
- wallBoxes().forEach((B,i)=>{if((B.aud?z0<-0.05:z0<0.05)&&boxHit(A,B))out.set('__wall'+i,boxDepth(A,B))});return out}
+ wallBoxes().forEach((B,i)=>{if((B.aud?inAudience(p.x,p.y):z0<0.05)&&boxHit(A,B))out.set('__wall'+i,boxDepth(A,B))});return out}
 // まとめて動かしてみて、床の外・新しいぶつかりがあれば元に戻す。ch=[[id,x,y,r?],...]
 function tryMove(ch){
  const sc=scene(),ids=new Set(ch.map(c=>c[0])),old=ch.map(([id])=>{const q=posRef(id);return [id,q.x,q.y,q.r]});
@@ -527,8 +554,8 @@ function drawPlan(c,w,h,vw,sc,o){
  const hw=T.width/2;
  // 客席
  const AL=audLayout(T);let [x0,y0]=P(b.x0,0),[x1,y1]=P(b.x1,-AL.end);c.fillStyle='#151821';c.fillRect(x0,y0,x1-x0,y1-y0);
- {c.fillStyle='rgba(120,128,150,.35)';const cw=0.42*k,cd=0.4*k;for(let r=0;r<AL.rows;r++){const yy=-(2.1+r*0.95);for(const x of AL.xs){const [cx,cy]=P(x,yy);c.fillRect(cx-cw/2,cy-cd/2,cw,cd)}}}
- c.fillStyle='#3a4050';c.font='12px sans-serif';c.textAlign='center';c.textBaseline='middle';const [cx,cy]=P(0,-1.05);c.fillText('客　席',cx,cy);
+ {c.fillStyle='rgba(120,128,150,.35)';const cw=0.42*k,cd=0.4*k;for(let r=0;r<AL.rows;r++){const yy=-AL.rowD(r);for(const x of AL.xs){const [cx,cy]=P(x,yy);c.fillRect(cx-cw/2,cy-cd/2,cw,cd)}}}
+ c.fillStyle='#3a4050';c.font='12px sans-serif';c.textAlign='center';c.textBaseline='middle';const [cx,cy]=P(0,-Math.min(1.05,AL.front*0.5));c.fillText(AL.on?'客　席（'+AL.total+'席）':'客　席',cx,cy);
  // 袖
  c.fillStyle='#181b24';for(const s of [-1,1]){const [a,bb]=P(s<0?b.x0:hw,T.depth),[a2,bb2]=P(s<0?-hw:b.x1,0);c.fillRect(a,bb,a2-a,bb2-bb)}
  // 舞台面
@@ -992,7 +1019,7 @@ $('#bLeft').onclick=()=>{$('#left').classList.toggle('open');$('#right').classLi
 $('#bRight').onclick=()=>{$('#right').classList.toggle('open');$('#left').classList.remove('open')};
 
 /* ---------- 劇場設定 ---------- */
-function openTheater(){const T=doc.theater;$('#tName').value=T.name;$('#tW').value=f2(T.width);$('#tD').value=f2(T.depth);$('#tH').value=f2(T.height);$('#tWing').value=f2(T.wing);$('#tSH').value=f2(T.stageH??0.9);$('#tGrid').value=String(T.grid);$('#tArch').checked=T.arch!==false;$('#tPhys').checked=T.physics!==false;$('#tDon').checked=!!(T.don&&T.don.on);$('#tDonC').value=(T.don&&T.don.color)||'#7a1622';$('#tTsura').value=String(T.tsura||0);$('#tTsuraBack').checked=!!T.tsuraBack;renderUlCtl();$('#mTheater').classList.add('show')}
+function openTheater(){const T=doc.theater;$('#tName').value=T.name;$('#tW').value=f2(T.width);$('#tD').value=f2(T.depth);$('#tH').value=f2(T.height);$('#tWing').value=f2(T.wing);$('#tSH').value=f2(T.stageH??0.9);$('#tGrid').value=String(T.grid);$('#tArch').checked=T.arch!==false;$('#tPhys').checked=T.physics!==false;{const c=audCfg(T),A=audLayout(T);$('#aOn').checked=c.on;$('#aRows').value=c.rows;$('#aSeats').value=c.seats||'';$('#aSeats').placeholder='自動（'+(A.xs.length)+'）';$('#aAisle').value=c.aisle;$('#aFront').value=f2(c.front);$('#aRake').checked=c.rake;$('#aRise').value=Math.round(c.rise*100);$('#aTotal').textContent=c.on?'合計 '+A.total+'席':''}$('#tDon').checked=!!(T.don&&T.don.on);$('#tDonC').value=(T.don&&T.don.color)||'#7a1622';$('#tTsura').value=String(T.tsura||0);$('#tTsuraBack').checked=!!T.tsuraBack;renderUlCtl();$('#mTheater').classList.add('show')}
 $('#bTheater').onclick=openTheater;$('#tClose').onclick=()=>{$('#mTheater').classList.remove('show');fitMain()};
 $('#mTheater').addEventListener('pointerdown',e=>{if(e.target.id==='mTheater'){$('#mTheater').classList.remove('show');fitMain()}});
 const tSet=(k,fn)=>{const el=$(k);el.onchange=()=>{change(()=>fn(el.value));openTheater();fitMain()};el.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing)el.blur()}};
@@ -1001,6 +1028,11 @@ for(const [id,fn,dec,mn,mx] of [['#tW',v=>doc.theater.width=v,2,1,200],['#tD',v=
 tSet('#tName',v=>doc.theater.name=v||'劇場');tSet('#tW',v=>doc.theater.width=clamp(num(v,doc.theater.width),1,200));tSet('#tD',v=>doc.theater.depth=clamp(num(v,doc.theater.depth),1,200));
 tSet('#tH',v=>doc.theater.height=clamp(num(v,doc.theater.height),1,100));tSet('#tSH',v=>doc.theater.stageH=clamp(num(v,0.9),0,5));tSet('#tWing',v=>doc.theater.wing=clamp(num(v,doc.theater.wing),0,50));
 $('#tTsura').onchange=()=>{change(()=>doc.theater.tsura=+$('#tTsura').value)};$('#tTsuraBack').onchange=()=>{change(()=>doc.theater.tsuraBack=$('#tTsuraBack').checked)};
+const audSet=(fn)=>{change(()=>{doc.theater.aud=doc.theater.aud||{};fn(doc.theater.aud)});openTheater()};
+$('#aOn').onchange=()=>audSet(a=>a.on=$('#aOn').checked);$('#aAisle').onchange=()=>audSet(a=>a.aisle=$('#aAisle').value);$('#aRake').onchange=()=>audSet(a=>a.rake=$('#aRake').checked);
+for(const [id,f,mn,mx,st,dec] of [['#aRows','rows',1,60,1,0],['#aSeats','seats',0,80,1,0],['#aFront','front',0.5,20,0.05,2],['#aRise','rise',0,60,1,0]]){const el=$(id);
+ el.onchange=()=>audSet(a=>{const v=String(el.value).trim()===''?0:num(el.value,null);if(v!==null)a[f]=clamp(dec?v:Math.round(v),mn,mx)});el.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing)el.blur()};
+ scrub(el,{step:st,dec,min:mn,max:mx,live:v=>{doc.theater.aud=doc.theater.aud||{};doc.theater.aud[f]=v;draw();const A=audLayout();$('#aTotal').textContent='合計 '+A.total+'席'},end:()=>{save();renderAll();openTheater()}})}
 $('#tPhys').onchange=()=>{change(()=>{doc.theater.physics=$('#tPhys').checked})};
 $('#tArch').onchange=()=>{change(()=>{doc.theater.arch=$('#tArch').checked})};
 $('#tDon').onchange=()=>{change(()=>{doc.theater.don=doc.theater.don||{color:'#7a1622'};doc.theater.don.on=$('#tDon').checked})};$('#tDonC').onchange=()=>{change(()=>{doc.theater.don=doc.theater.don||{on:true};doc.theater.don.color=$('#tDonC').value})};
@@ -1239,7 +1271,7 @@ const cam={tx:0,ty:1.2,tz:-4,yaw:0,pitch:0.2,dist:14,fov:42*Math.PI/180};let cam
 function camEye(c){c=c||cam;const cp=Math.cos(c.pitch);return [c.tx+c.dist*Math.sin(c.yaw)*cp,c.ty+c.dist*Math.sin(c.pitch),c.tz+c.dist*Math.cos(c.yaw)*cp]}
 function camFrom(e,t){const d=sub(e,t),dist=Math.hypot(...d);return {tx:t[0],ty:t[1],tz:t[2],dist,pitch:Math.asin(clamp(d[1]/dist,-1,1)),yaw:Math.atan2(d[0],d[2])}}
 const CAMS={
- aud:['客席から',T=>{const z=Math.max(8,T.width*0.85),sh=T.stageH??0.9;return [[0,-sh+1.15,z],[0,0.9,-T.depth*0.45]]}],
+ aud:['客席から',T=>{const A=audLayout(T),z=A.rows?Math.min(A.end-0.5,Math.max(A.front+1,T.width*0.85)):Math.max(8,T.width*0.85);return [[0,audFloorAt(-z)+1.15,z],[0,0.9,-T.depth*0.45]]}],
  bal:['2階席',T=>[[0,6.5,T.width*1.05+5],[0,0.4,-T.depth*0.45]]],
  diag:['ななめ',T=>[[T.width*0.85,T.width*0.55+2,T.width*0.6+3],[0,0.4,-T.depth*0.45]]],
  top:['真上',T=>[[0,Math.max(T.width,T.depth)*1.35+3,-T.depth*0.5+0.01],[0,0,-T.depth*0.5]]],
@@ -1320,12 +1352,16 @@ function boxInto(P,N,I,x0,y0,z0,x1,y1,z1){const F=[[[1,0,0],[0,0,-1],[0,1,0]],[[
  const cx=(x0+x1)/2,cy=(y0+y1)/2,cz=(z0+z1)/2,sx=Math.abs(x1-x0)/2,sy=Math.abs(y1-y0)/2,sz=Math.abs(z1-z0)/2;
  for(const [n,u,v] of F){const b=P.length/3;for(const [a,c] of [[-1,-1],[1,-1],[1,1],[-1,1]]){P.push(cx+(n[0]+u[0]*a+v[0]*c)*sx,cy+(n[1]+u[1]*a+v[1]*c)*sy,cz+(n[2]+u[2]*a+v[2]*c)*sz);N.push(...n)}I.push(b,b+1,b+2,b,b+2,b+3)}}
 let AUD=null;
-function audMesh(T){const sh=T.stageH??0.9,key=T.width+'|'+sh;if(AUD&&AUD.key===key)return AUD;
- const S={P:[],N:[],I:[]},Fm={P:[],N:[],I:[]},{xs,rows}=audLayout(T);
- for(let r=0;r<rows;r++){const z=2.1+r*0.95,y=-sh;for(const x of xs){const t=0.02;
-  boxInto(S.P,S.N,S.I,x-0.21,y+0.41,z-0.2,x+0.21,y+0.44,z+0.18);boxInto(S.P,S.N,S.I,x-0.2,y+0.55,z+0.19,x+0.2,y+0.78,z+0.22);
-  for(const sx of [-1,1]){const lx=x+sx*0.2;boxInto(Fm.P,Fm.N,Fm.I,lx-t/2,y,z-0.19,lx+t/2,y+0.43,z-0.17);boxInto(Fm.P,Fm.N,Fm.I,lx-t/2,y,z+0.2,lx+t/2,y+0.8,z+0.22)}}}
- AUD={key,seat:mkMesh(S.P,S.N,null,S.I),frame:mkMesh(Fm.P,Fm.N,null,Fm.I)};return AUD}
+function audMesh(T){const sh=T.stageH??0.9,A=audLayout(T),key=JSON.stringify([audCfg(T),T.width,sh]);if(AUD&&AUD.key===key)return AUD;
+ const seat=[],frame=[],steps=[];let S={P:[],N:[],I:[]},Fm={P:[],N:[],I:[]},St={P:[],N:[],I:[]};
+ const flush=(o,arr)=>{if(o.I.length)arr.push(mkMesh(o.P,o.N,null,o.I))};
+ for(let r=0;r<A.rows;r++){const z=A.rowD(r),y=A.rake?-sh+(r+1)*A.rise:-sh;
+  if(A.rake){boxInto(St.P,St.N,St.I,-A.hw,-sh,z-ROWP/2,A.hw,y,z+ROWP/2)}
+  for(const x of A.xs){const t=0.02;
+   if(S.P.length/3>60000){flush(S,seat);S={P:[],N:[],I:[]}}if(Fm.P.length/3>60000){flush(Fm,frame);Fm={P:[],N:[],I:[]}}
+   boxInto(S.P,S.N,S.I,x-0.21,y+0.41,z-0.2,x+0.21,y+0.44,z+0.18);boxInto(S.P,S.N,S.I,x-0.2,y+0.55,z+0.19,x+0.2,y+0.78,z+0.22);
+   for(const sx of [-1,1]){const lx=x+sx*0.2;boxInto(Fm.P,Fm.N,Fm.I,lx-t/2,y,z-0.19,lx+t/2,y+0.43,z-0.17);boxInto(Fm.P,Fm.N,Fm.I,lx-t/2,y,z+0.2,lx+t/2,y+0.8,z+0.22)}}}
+ flush(S,seat);flush(Fm,frame);flush(St,steps);AUD={key,seat,frame,steps};return AUD}
 function floorMesh(T){const key=JSON.stringify([T.width,T.depth,T.outline]);if(G3.floorKey===key)return G3.floor;
  let poly=T.outline&&T.outline.length>2?T.outline.map(([x,y])=>[x,-y]):[[-T.width/2,0],[T.width/2,0],[T.width/2,-T.depth],[-T.width/2,-T.depth]];
  // 耳切り（三角形分割）
@@ -1421,8 +1457,8 @@ function draw3d(){
  gl.disable(gl.POLYGON_OFFSET_FILL);
  for(const s of [-1,1])dm(G3.m.box,BX(s>0?xr:xl-0.2,-sh,0.3,s>0?xr+0.2:xl,top+1.5,-(T.depth+0.45)),'#15171f');
  // 客席
- dm(G3.m.box,BX(xl-4,-sh-0.1,0,xr+4,-sh,18),'#1b1719');
- {const A=audMesh(T);dm(A.seat,M4.id(),'#3c4250');dm(A.frame,M4.id(),'#8a9099')}
+ {const AL=audLayout(T);dm(G3.m.box,BX(Math.min(xl,-AL.hw)-3,-sh-0.1,0,Math.max(xr,AL.hw)+3,-sh,AL.end+4),'#1b1719')}
+ {const A=audMesh(T);for(const m of A.steps)dm(m,M4.id(),'#221d20');for(const m of A.seat)dm(m,M4.id(),'#3c4250');for(const m of A.frame)dm(m,M4.id(),'#8a9099')}
  // もの・役者
  const sc=scene(),its=doc.items.map(it=>({it,p:posOf(it.id,sc)})).filter(e=>e.p);
  const solid=its.filter(e=>e.p.a>=0.999),fade=its.filter(e=>e.p.a<0.999);
