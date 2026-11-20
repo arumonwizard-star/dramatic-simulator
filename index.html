@@ -194,6 +194,7 @@ body.view #present{display:block}
  <div class="row"><label>高さ</label><input type="text" inputmode="decimal" id="tH"><span class="u">m</span></div>
  <div class="row"><label>舞台の高さ</label><input type="text" inputmode="decimal" id="tSH"><span class="u">m</span></div>
  <div class="row"><label>袖の幅</label><input type="text" inputmode="decimal" id="tWing"><span class="u">m</span></div>
+ <div class="row"><label>ぶつかり</label><input type="checkbox" id="tPhys"><span class="note" style="margin:0">床の外に出ない・壁や物を通り抜けない</span></div>
  <div class="row"><label>額縁</label><input type="checkbox" id="tArch"><span class="note" style="margin:0">プロセニアムアーチを出す</span></div>
  <div class="row"><label>緞帳</label><input type="checkbox" id="tDon"><span class="note" style="margin:0">緞帳がある劇場</span><input type="color" id="tDonC" style="margin-left:auto"></div>
  <div class="row"><label>ツラ番号</label><select id="tTsura"><option value="0">出さない</option><option value="0.5">50cmごと</option><option value="0.9">90cmごと</option><option value="0.909">3尺（90.9cm）ごと</option><option value="1">1mごと</option></select></div>
@@ -265,7 +266,7 @@ body.view #present{display:block}
 
 <script>
 'use strict';
-const VER='1.8.1';
+const VER='1.9.0';
 // iPhoneのSafari（ホーム画面から開いたとき以外）は画面の上をぼかすので、その分ボタンを下げる
 (()=>{const ios=/iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),sa=navigator.standalone||matchMedia('(display-mode: standalone)').matches;if(ios&&!sa)document.documentElement.classList.add('iosweb')})();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -373,7 +374,7 @@ function updUndo(){$('#bUndo').disabled=!undoS.length;$('#bRedo').disabled=!redo
 function undo(){if(!undoS.length)return;redoS.push(snap());doc=JSON.parse(undoS.pop());afterLoad()}
 function redo(){if(!redoS.length)return;undoS.push(snap());doc=JSON.parse(redoS.pop());afterLoad()}
 function afterLoad(){fixDoc(doc);doc.cur=clamp(doc.cur,0,doc.scenes.length-1);if(sel&&!item(sel)&&!markOf(sel))sel=null;updUndo();save();renderAll()}
-function change(fn){pushUndo();fn();save();renderAll()}
+function change(fn){pushUndo();const before=new Set(doc.items.map(i=>i.id));fn();for(const it of doc.items)if(!before.has(it.id))placeFree(it.id);save();renderAll()}
 
 /* ---------- 位置計算 ---------- */
 // 座標: x=センターから上手(+)へ[m]、y=舞台のツラから奥(+)へ[m]、z=床から上[m]
@@ -416,6 +417,50 @@ function inFoot(o,p,x,y){const dx=x-p.x,dy=y-p.y,a=p.r*Math.PI/180;const lx=dx*M
 // 床に置いた形（四角）の角と中心
 function footPts(it,p){const a=p.r*Math.PI/180,c=Math.cos(a),s=Math.sin(a),hw=it.w/200*0.92,hd=it.d/200*0.92;return [[0,0],[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([x,y])=>[p.x+x*c+y*s,p.y-x*s+y*c])}
 function footOverlap(a,pa,b,pb){return footPts(a,pa).some(([x,y])=>inFoot(b,pb,x,y))||footPts(b,pb).some(([x,y])=>inFoot(a,pa,x,y))}
+/* ---------- 床の外に出ない・壁や物を通り抜けない ---------- */
+const physicsOn=()=>doc.theater.physics!==false;
+function inPoly(poly,x,y){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [xi,yi]=poly[i],[xj,yj]=poly[j];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))c=!c}return c}
+// その点に舞台の床（舞台面か袖）があるか
+function onFloorPt(x,y){const T=doc.theater,hw=T.width/2,e=0.002;
+ if(Math.abs(x)>=hw-e&&Math.abs(x)<=hw+T.wing+e&&y>=-e&&y<=T.depth+e)return true;
+ if(T.outline&&T.outline.length>2)return inPoly(T.outline,x,y);
+ return Math.abs(x)<=hw+e&&y>=-e&&y<=T.depth+e}
+function onFloorItem(it,p){if(it.type==='actor'||it.drape)return onFloorPt(p.x,p.y);return footPts(it,p).every(([x,y])=>onFloorPt(x,y))}
+// 床の上の形（回転した四角）。役者は体の幅の四角
+function boxOf(it,p){const a=p.r*Math.PI/180,c=Math.cos(a),s=Math.sin(a);let hw,hd;if(it.type==='actor'){hw=hd=Math.max(it.w,it.d)/200*0.82}else{hw=it.w/200;hd=it.d/200}return {cx:p.x,cy:p.y,u:[c,-s],v:[s,c],hw,hd}}
+function boxHit(A,B){for(const ax of [A.u,A.v,B.u,B.v]){const pr=X=>Math.abs(X.hw*(X.u[0]*ax[0]+X.u[1]*ax[1]))+Math.abs(X.hd*(X.v[0]*ax[0]+X.v[1]*ax[1]));if(Math.abs((B.cx-A.cx)*ax[0]+(B.cy-A.cy)*ax[1])>=pr(A)+pr(B)-0.004)return false}return true}
+// 動かない壁（額縁の柱）
+function wallBoxes(){const T=doc.theater,hw=T.width/2,out=[];if(T.arch!==false)for(const s of [-1,1])out.push({cx:s*(hw+0.6),cy:-0.05,u:[1,0],v:[0,1],hw:0.6,hd:0.2});return out}
+// その物がいまぶつかっている相手（高さが重なっているものだけ。上に乗っているのはぶつかりではない）
+function hitsOf(id,sc){const it=item(id),out=new Set();if(!it||it.drape)return out;const p=posOf(id,sc);if(!p)return out;const A=boxOf(it,p),z0=baseZ(it,p,sc),z1=z0+it.h/100;
+ for(const o of doc.items){if(o===it||o.drape)continue;const q=posOf(o.id,sc);if(!q||q.a<.5)continue;const w0=baseZ(o,q,sc),w1=w0+o.h/100;if(Math.min(z1,w1)-Math.max(z0,w0)<=0.01)continue;if(boxHit(A,boxOf(o,q)))out.add(o.id)}
+ if(z0<0.05)wallBoxes().forEach((B,i)=>{if(boxHit(A,B))out.add('__wall'+i)});return out}
+// まとめて動かしてみて、床の外・新しいぶつかりがあれば元に戻す。ch=[[id,x,y,r?],...]
+function tryMove(ch){
+ const sc=scene(),ids=new Set(ch.map(c=>c[0])),old=ch.map(([id])=>{const q=posRef(id);return [id,q.x,q.y,q.r]});
+ const set=arr=>{for(const [id,x,y,r] of arr){const q=posRef(id);if(!q)continue;q.x=+(+x).toFixed(3);q.y=+(+y).toFixed(3);if(r!==undefined)q.r=r}};
+ if(!physicsOn()){set(ch);return true}
+ const before={};for(const [id] of ch){const mk=markOf(id);if(mk){before[id]={off:!onFloorPt(mk.x,mk.y)};continue}const it=item(id),p=sc.pos[id];if(!it||!p||!p.on){before[id]={skip:1};continue}before[id]={off:!onFloorItem(it,p),hits:hitsOf(id,sc)}}
+ set(ch);let ok=true;
+ for(const [id] of ch){const b=before[id];if(b.skip)continue;const mk=markOf(id);if(mk){if(!b.off&&!onFloorPt(mk.x,mk.y)){ok=false;break}continue}
+  const it=item(id),p=sc.pos[id];if(!b.off&&!onFloorItem(it,p)){ok=false;break}for(const h of hitsOf(id,sc)){if(ids.has(h))continue;if(!b.hits.has(h)){ok=false;break}}if(!ok)break}
+ if(!ok)set(old);return ok}
+// 動かす。ぶつかったら、横だけ・前後だけでも動けないか試す（壁にそって滑る）
+function slideMove(ids,dx,dy){const P=ids.map(id=>[id,posRef(id)]).filter(([,q])=>q);if(!P.length)return false;
+ const at=(fx,fy)=>tryMove(P.map(([id,q])=>[id,q.x+fx,q.y+fy]));
+ if(at(dx,dy))return true;
+ // ぶつかる手前まで寄せる（1cm単位まで詰める）
+ const reach=(fx,fy)=>{if(Math.hypot(fx,fy)<0.005)return false;let lo=0,hi=1;for(let i=0;i<8;i++){const m=(lo+hi)/2,X=P.map(([id,q])=>[id,q.x+fx*m,q.y+fy*m]),ok=tryMove(X);if(ok){tryMove(X.map(([id,x,y])=>[id,x-fx*m,y-fy*m]));lo=m}else hi=m}
+  if(lo<0.02)return false;return at(Math.round(fx*lo*100)/100,Math.round(fy*lo*100)/100)||at(fx*lo,fy*lo)};
+ const moved=reach(dx,dy);
+ // 残りは壁にそって滑る
+ const r1=Math.abs(dx)>1e-6&&at(dx,0),r2=!r1&&Math.abs(dy)>1e-6&&at(0,dy);if(r1||r2)return true;
+ return reach(dx,0)||reach(0,dy)||moved}
+// 置いた場所がふさがっていたら、近くの空いている所へ
+function placeFree(id){if(!physicsOn())return;const it=item(id),p=scene().pos[id];if(!it||!p||!p.on||it.drape)return;const x0=p.x,y0=p.y;
+ const ok=()=>onFloorItem(it,p)&&![...hitsOf(id,scene())].length;if(ok())return;
+ for(let r=0.25;r<=6;r+=0.25){const n=Math.max(8,Math.round(r*10));for(let i=0;i<n;i++){const a=i/n*Math.PI*2;p.x=+(x0+Math.cos(a)*r).toFixed(2);p.y=+(y0+Math.sin(a)*r).toFixed(2);if(ok())return}}p.x=x0;p.y=y0}
+let toastT=0;function toastOnce(t){const n=performance.now();if(n-toastT<1800)return;toastT=n;toast(t)}
 function baseZ(it,p,sc,depth){let z=(it.elev||0)/100;if(it.drape||(depth||0)>12)return z;
  const lim=it.type==='actor'?doc.items.length:doc.items.indexOf(it);
  for(let i=0;i<lim;i++){const o=doc.items[i];if(o===it||o.type!=='object'||!o.stand||o.drape)continue;const q=posOf(o.id,sc);if(!q||q.a<.5)continue;
@@ -706,14 +751,14 @@ cv.addEventListener('pointermove',e=>{
  if(drag.t==='band'){drag.x1=sx;drag.y1=sy;draw();return}
  if(drag.t==='group'){let dx,dy=0;if(drag.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);dx=snapv(wx-drag.wx,e.altKey);dy=snapv(wy-drag.wy,e.altKey)}else dx=snapv((sx-V.ox)/V.k-drag.wx,e.altKey);
   const ref=drag.st[sel];if(ref&&!e.altKey){const mv=new Set(Object.keys(drag.st)),[nx,ny,gx,gy]=magnet(ref.x+dx,ref.y+dy,mv,10/V.k,drag.reg==='plan');if(gx)dx=nx-ref.x;if(gy)dy=ny-ref.y}else clearGuides();
-  for(const id in drag.st){const q=posRef(id);if(q){q.x=+(drag.st[id].x+dx).toFixed(3);q.y=+(drag.st[id].y+dy).toFixed(3)}}drag.moved=true;draw();return}
+  {const ids=Object.keys(drag.st),r0=posRef(sel)||posRef(ids[0]),k0=drag.st[sel]?sel:ids[0];slideMove(ids,drag.st[k0].x+dx-r0.x,drag.st[k0].y+dy-r0.y)}drag.moved=true;draw();return}
  if(drag.t==='meas'){measure.b=Sp(V,sx,sy);if(!e.altKey){measure.b=measure.b.map(v=>snapv(v))}draw();return}
  const p=posRef(sel);if(!p)return;
  if(drag.t==='item'){const tol=10/V.k,mv=new Set([sel]);
-  if(drag.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);let nx=wx+drag.dx,ny=wy+drag.dy,gx=false,gy=false;if(!e.altKey)[nx,ny,gx,gy]=magnet(nx,ny,mv,tol,true);else clearGuides();p.x=gx?nx:snapv(nx,e.altKey);p.y=gy?ny:snapv(ny,e.altKey)}
-  else{let nx=(sx-V.ox)/V.k+drag.dx,gx=false;if(!e.altKey)[nx,,gx]=magnet(nx,p.y,mv,tol,false);else clearGuides();p.x=gx?nx:snapv(nx,e.altKey)}
-  p.x=+p.x.toFixed(3);p.y=+p.y.toFixed(3);drag.moved=true;draw();liveProps()}
- if(drag.t==='rot'){const [cx,cy]=pS(V,p.x,p.y);let a=Math.atan2(-(sx-cx),sy-cy)*180/Math.PI;if(!e.altKey)a=Math.round(a/15)*15;p.r=Math.round(((a%360)+540)%360-180);drag.moved=true;draw();liveProps()}
+  if(drag.reg==='plan'){const [wx,wy]=Sp(V,sx,sy);let nx=wx+drag.dx,ny=wy+drag.dy,gx=false,gy=false;if(!e.altKey)[nx,ny,gx,gy]=magnet(nx,ny,mv,tol,true);else clearGuides();const tx=gx?nx:snapv(nx,e.altKey),ty=gy?ny:snapv(ny,e.altKey);slideMove([sel],tx-p.x,ty-p.y)}
+  else{let nx=(sx-V.ox)/V.k+drag.dx,gx=false;if(!e.altKey)[nx,,gx]=magnet(nx,p.y,mv,tol,false);else clearGuides();const tx=gx?nx:snapv(nx,e.altKey);slideMove([sel],tx-p.x,0)}
+  drag.moved=true;draw();liveProps()}
+ if(drag.t==='rot'){const [cx,cy]=pS(V,p.x,p.y);let a=Math.atan2(-(sx-cx),sy-cy)*180/Math.PI;if(!e.altKey)a=Math.round(a/15)*15;tryMove([[sel,p.x,p.y,Math.round(((a%360)+540)%360-180)]]);drag.moved=true;draw();liveProps()}
 });
 function endPtr(e){ptrs.delete(e.pointerId);if(guides.x!==null||guides.y!==null){clearGuides();setTimeout(draw,0)}if(mode==='3d'){up3();return}if(!drag)return;if(drag.t==='pinch'){if(ptrs.size<2)drag=null;return}
  if((drag.t==='item'||drag.t==='rot')&&drag.moved){pushUndo(drag.s0);renderThumb(doc.cur);if(markOf(sel))renderList();save()}
@@ -743,7 +788,7 @@ document.addEventListener('keydown',e=>{
   else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();goScene(doc.cur-1,false)}else if(e.key==='Escape')endPresent();return}
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
  if(sel&&e.key.startsWith('Arrow')){e.preventDefault();const ps=selIds().map(posRef).filter(Boolean);if(!ps.length)return;const s=e.shiftKey?0.5:0.05;pushUndo();
-  for(const p of ps){if(e.key==='ArrowLeft')p.x-=s;if(e.key==='ArrowRight')p.x+=s;if(e.key==='ArrowUp')p.y+=s;if(e.key==='ArrowDown')p.y-=s;p.x=+p.x.toFixed(3);p.y=+p.y.toFixed(3)}draw();liveProps();renderThumb(doc.cur);save();return}
+  const dx=e.key==='ArrowLeft'?-s:e.key==='ArrowRight'?s:0,dy=e.key==='ArrowUp'?s:e.key==='ArrowDown'?-s:0;if(!slideMove(selIds(),dx,dy))toastOnce('そこには動かせません（床の外・壁・ほかの物）');draw();liveProps();renderThumb(doc.cur);save();return}
  if(!sel&&(e.key==='ArrowRight'||e.key==='PageDown')){e.preventDefault();goScene(doc.cur+1,true)}
  if(!sel&&(e.key==='ArrowLeft'||e.key==='PageUp')){e.preventDefault();goScene(doc.cur-1,false)}
  if(e.key==='Escape'&&sel){clearSel();renderProps();renderList();draw()}
@@ -765,7 +810,7 @@ $('#addMark').onclick=()=>{change(()=>{const n=doc.marks.length;const m={id:uid(
 $('#addActor').addEventListener('click',()=>setTimeout(closeMobile,0));$('#addKuroko').addEventListener('click',()=>setTimeout(closeMobile,0));$('#addMark').addEventListener('click',()=>setTimeout(closeMobile,0));
 $('#addActor').onclick=()=>change(()=>{const n=doc.items.filter(i=>i.type==='actor').length;const it={id:uid(),type:'actor',name:'役者'+String.fromCharCode(65+n%26),color:ACOL[n%ACOL.length],h:165,w:44,d:27,elev:0};doc.items.push(it);scene().pos[it.id]={x:0,y:Math.min(2,doc.theater.depth/2),r:0,on:true};sel=it.id});
 function lastPos(id){for(let i=doc.cur;i>=0;i--){const p=doc.scenes[i].pos[id];if(p)return p}for(const s of doc.scenes)if(s.pos[id])return s.pos[id];return null}
-function setOn(id,on){change(()=>{const sc=scene();let p=sc.pos[id];if(!p){const l=lastPos(id);p=sc.pos[id]=l?{...l}:{x:0,y:doc.theater.depth/2,r:0,on:true}}p.on=on})}
+function setOn(id,on){change(()=>{const sc=scene();let p=sc.pos[id];if(!p){const l=lastPos(id);p=sc.pos[id]=l?{...l}:{x:0,y:doc.theater.depth/2,r:0,on:true}}p.on=on;if(on)placeFree(id)})}
 function renderList(){
  const sc=scene();const h=[['actor','役者・クロコ',i=>i.type==='actor'],['object','舞台セット・小道具',i=>i.type==='object'&&!i.drape],['object','吊りもの・幕',i=>i.drape]].map(([tp,ttl,fl])=>{const its=doc.items.filter(fl);if(!its.length)return '';
   return `<h3 style="margin-top:8px">${ttl}</h3>`+its.map(it=>{const on=sc.pos[it.id]&&sc.pos[it.id].on;
@@ -874,7 +919,7 @@ function applyKey(k,v){
  else if(k.startsWith('m.')){const m=markOf(sel),f=k.slice(2);if(f==='size'){const n=num(v,null);if(n!==null)m.size=clamp(n,5,300)}else m[f]=v}
  else if(k==='po'){const p=posRef(sel),n=num(v,null);if(n!==null)p.open=clamp(n/100,0,1)}
  else if(k==='sc.don'){const n=num(v,null);if(n!==null)scene().don=clamp(n/100,0,1)}
- else if(k==='px'||k==='py'||k==='pr'){const p=posRef(sel);const n=num(v,null);if(n!==null){if(k==='pr')p.r=Math.round(((n%360)+540)%360-180);else p[k[1]]=+n.toFixed(3)}}
+ else if(k==='px'||k==='py'||k==='pr'){const p=posRef(sel);const n=num(v,null);if(n!==null){const nx=k==='px'?n:p.x,ny=k==='py'?n:p.y,nr=k==='pr'?Math.round(((n%360)+540)%360-180):p.r;if(!tryMove([[sel,nx,ny,nr]]))toastOnce('そこには置けません（床の外・壁・ほかの物とぶつかる）')}}
  else{const it=item(sel);if(k==='sheer'||k==='split')it[k]=!!v;else if(k==='kuroko'){it.kuroko=!!v;if(v)it.color=BLACK;else if(it.color===BLACK)it.color=ACOL[0]}else if(['h','w','d','elev'].includes(k)){const n=num(v,null);if(n!==null)it[k]=Math.max(k==='elev'?-500:1,Math.round(n*10)/10)}else it[k]=v}}
 /* ---------- 数値：打ち込み＋ドラッグ（左右に引っぱる） ---------- */
 // 入力欄か左の名前を左右にドラッグすると値が変わる。Shiftで10倍、Altで1/10。クリックだけなら打ち込み。
@@ -926,7 +971,7 @@ $('#bLeft').onclick=()=>{$('#left').classList.toggle('open');$('#right').classLi
 $('#bRight').onclick=()=>{$('#right').classList.toggle('open');$('#left').classList.remove('open')};
 
 /* ---------- 劇場設定 ---------- */
-function openTheater(){const T=doc.theater;$('#tName').value=T.name;$('#tW').value=f2(T.width);$('#tD').value=f2(T.depth);$('#tH').value=f2(T.height);$('#tWing').value=f2(T.wing);$('#tSH').value=f2(T.stageH??0.9);$('#tGrid').value=String(T.grid);$('#tArch').checked=T.arch!==false;$('#tDon').checked=!!(T.don&&T.don.on);$('#tDonC').value=(T.don&&T.don.color)||'#7a1622';$('#tTsura').value=String(T.tsura||0);$('#tTsuraBack').checked=!!T.tsuraBack;renderUlCtl();$('#mTheater').classList.add('show')}
+function openTheater(){const T=doc.theater;$('#tName').value=T.name;$('#tW').value=f2(T.width);$('#tD').value=f2(T.depth);$('#tH').value=f2(T.height);$('#tWing').value=f2(T.wing);$('#tSH').value=f2(T.stageH??0.9);$('#tGrid').value=String(T.grid);$('#tArch').checked=T.arch!==false;$('#tPhys').checked=T.physics!==false;$('#tDon').checked=!!(T.don&&T.don.on);$('#tDonC').value=(T.don&&T.don.color)||'#7a1622';$('#tTsura').value=String(T.tsura||0);$('#tTsuraBack').checked=!!T.tsuraBack;renderUlCtl();$('#mTheater').classList.add('show')}
 $('#bTheater').onclick=openTheater;$('#tClose').onclick=()=>{$('#mTheater').classList.remove('show');fitMain()};
 $('#mTheater').addEventListener('pointerdown',e=>{if(e.target.id==='mTheater'){$('#mTheater').classList.remove('show');fitMain()}});
 const tSet=(k,fn)=>{const el=$(k);el.onchange=()=>{change(()=>fn(el.value));openTheater();fitMain()};el.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing)el.blur()}};
@@ -935,6 +980,7 @@ for(const [id,fn,dec,mn,mx] of [['#tW',v=>doc.theater.width=v,2,1,200],['#tD',v=
 tSet('#tName',v=>doc.theater.name=v||'劇場');tSet('#tW',v=>doc.theater.width=clamp(num(v,doc.theater.width),1,200));tSet('#tD',v=>doc.theater.depth=clamp(num(v,doc.theater.depth),1,200));
 tSet('#tH',v=>doc.theater.height=clamp(num(v,doc.theater.height),1,100));tSet('#tSH',v=>doc.theater.stageH=clamp(num(v,0.9),0,5));tSet('#tWing',v=>doc.theater.wing=clamp(num(v,doc.theater.wing),0,50));
 $('#tTsura').onchange=()=>{change(()=>doc.theater.tsura=+$('#tTsura').value)};$('#tTsuraBack').onchange=()=>{change(()=>doc.theater.tsuraBack=$('#tTsuraBack').checked)};
+$('#tPhys').onchange=()=>{change(()=>{doc.theater.physics=$('#tPhys').checked})};
 $('#tArch').onchange=()=>{change(()=>{doc.theater.arch=$('#tArch').checked})};
 $('#tDon').onchange=()=>{change(()=>{doc.theater.don=doc.theater.don||{color:'#7a1622'};doc.theater.don.on=$('#tDon').checked})};$('#tDonC').onchange=()=>{change(()=>{doc.theater.don=doc.theater.don||{on:true};doc.theater.don.color=$('#tDonC').value})};
 $('#tGrid').onchange=()=>{change(()=>doc.theater.grid=+$('#tGrid').value)};
@@ -1415,9 +1461,9 @@ function move3(e,sx,sy){
  if(drag3.t==='orbit'){cam.yaw=drag3.c0.yaw-(sx-drag3.x)*0.006;cam.pitch=clamp(drag3.c0.pitch+(sy-drag3.y)*0.005,-0.15,1.55);draw();return}
  if(drag3.t==='pan'){panBy(sx-drag3.x,sy-drag3.y,drag3.c0);draw();return}
  if(drag3.t==='group'){const q=hitPlane(ray3(sx,sy),drag3.y);if(!q||!drag3.q0)return;let dx=snapv(q[0]-drag3.q0[0],e.altKey),dy=snapv(-(q[2]-drag3.q0[2]),e.altKey);
-  const ref=drag3.st[sel];if(ref&&!e.altKey){const [nx,ny,gx,gy]=magnet(ref.x+dx,ref.y+dy,new Set(Object.keys(drag3.st)),Math.max(0.08,cam.dist*0.012),true);if(gx)dx=nx-ref.x;if(gy)dy=ny-ref.y}else clearGuides();for(const id in drag3.st){const p=posRef(id);if(p){p.x=+(drag3.st[id].x+dx).toFixed(3);p.y=+(drag3.st[id].y+dy).toFixed(3)}}drag3.moved=true;draw();return}
+  const ref=drag3.st[sel];if(ref&&!e.altKey){const [nx,ny,gx,gy]=magnet(ref.x+dx,ref.y+dy,new Set(Object.keys(drag3.st)),Math.max(0.08,cam.dist*0.012),true);if(gx)dx=nx-ref.x;if(gy)dy=ny-ref.y}else clearGuides();{const ids=Object.keys(drag3.st),k0=drag3.st[sel]?sel:ids[0],r0=posRef(k0);slideMove(ids,drag3.st[k0].x+dx-r0.x,drag3.st[k0].y+dy-r0.y)}drag3.moved=true;draw();return}
  if(drag3.t==='item'){const q=hitPlane(ray3(sx,sy),drag3.y),p=posRef(sel);if(!q||!p)return;let nx=q[0]+drag3.dx,ny=-q[2]+drag3.dy,gx=false,gy=false;if(!e.altKey)[nx,ny,gx,gy]=magnet(nx,ny,new Set([sel]),Math.max(0.08,cam.dist*0.012),true);else clearGuides();
-  p.x=+(gx?nx:snapv(nx,e.altKey)).toFixed(3);p.y=+(gy?ny:snapv(ny,e.altKey)).toFixed(3);drag3.moved=true;draw();liveProps()}}
+  slideMove([sel],(gx?nx:snapv(nx,e.altKey))-p.x,(gy?ny:snapv(ny,e.altKey))-p.y);drag3.moved=true;draw();liveProps()}}
 function panBy(dx,dy,c0){const r=cv.getBoundingClientRect(),e=camEye(c0),f=nrm(sub([c0.tx,c0.ty,c0.tz],e)),s=nrm(cross(f,[0,1,0])),u=cross(s,f),k=2*c0.dist*Math.tan(cam.fov/2)/r.height;
  cam.tx=c0.tx-(s[0]*dx-u[0]*dy)*k;cam.ty=clamp(c0.ty-(s[1]*dx-u[1]*dy)*k,-1,20);cam.tz=c0.tz-(s[2]*dx-u[2]*dy)*k}
 function up3(){if(guides.x!==null||guides.y!==null){clearGuides();setTimeout(draw,0)}if(!drag3)return;if(drag3.t==='pinch'){if(ptrs.size<2)drag3=null;return}if(drag3.t==='group'&&drag3.moved){pushUndo(drag3.s0);renderList();renderThumb(doc.cur);save()}if(drag3.t==='item'&&drag3.moved){pushUndo(drag3.s0);if(markOf(sel))renderList();renderThumb(doc.cur);save()}drag3=null}
