@@ -276,7 +276,7 @@ body.view #present{display:block}
 
 <script>
 'use strict';
-const VER='1.10.0';
+const VER='1.10.1';
 // iPhoneは画面の上（時計の下）をぼかすので、その分ボタンを下げる（Safariでもホーム画面のアプリでも）
 (()=>{const ios=/iP(hone|od|ad)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),sa=navigator.standalone||matchMedia('(display-mode: standalone)').matches;if(ios)document.documentElement.classList.add('iosweb');if(ios&&sa)document.documentElement.classList.add('iosapp')})();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -844,7 +844,7 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ---------- 2回押し ---------- */
-function twice(btn,fn,label){btn.addEventListener('click',()=>{if(btn.dataset.armed){clearTimeout(btn._t);delete btn.dataset.armed;btn.classList.remove('armed');btn.textContent=btn._l;fn()}else{btn._l=btn.textContent;btn.dataset.armed=1;btn.classList.add('armed');btn.textContent=label||'もう一度押すと実行';btn._t=setTimeout(()=>{delete btn.dataset.armed;btn.classList.remove('armed');btn.textContent=btn._l},3000)}})}
+function twice(btn,fn,label){btn.addEventListener('click',()=>{if(btn.dataset.armed){clearTimeout(btn._t);delete btn.dataset.armed;btn.classList.remove('armed');btn.textContent=btn._l;fn()}else{btn._l=btn.textContent;btn.dataset.armed=1;btn.classList.add('armed');btn.textContent=label||'実行を確定';btn._t=setTimeout(()=>{delete btn.dataset.armed;btn.classList.remove('armed');btn.textContent=btn._l},3000)}})}
 
 /* ---------- 一覧 ---------- */
 PRESETS.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${p[0]}（${p[1]}×${p[2]}×高${p[3]}cm）`;$('#addObj').appendChild(o)});
@@ -897,7 +897,7 @@ function renderMulti(el){
  $('#gMirror').onclick=()=>change(()=>pos().forEach(([,p])=>{p.x=-p.x;if('r' in p)p.r=-p.r}));
  $('#gDup').onclick=()=>change(()=>{const ns=[];for(const it of its){const n={...it,id:uid(),name:it.name+'2'};doc.items.push(n);const q=scene().pos[it.id]||{x:0,y:2,r:0,on:true};scene().pos[n.id]={...q,x:q.x+0.5,on:true};ns.push(n.id)}
   for(const m of mks){const n={...m,id:uid(),x:m.x+0.5};doc.marks.push(n);ns.push(n.id)}selSet=new Set(ns);sel=ns[ns.length-1]||null});
- twice($('#gDel'),()=>change(()=>{const del=new Set(ids);doc.items=doc.items.filter(i=>!del.has(i.id));doc.scenes.forEach(s=>{for(const id of del)delete s.pos[id]});doc.marks=doc.marks.filter(m=>!del.has(m.id));clearSel()}),'もう一度押すと全部削除');
+ twice($('#gDel'),()=>change(()=>{const del=new Set(ids);doc.items=doc.items.filter(i=>!del.has(i.id));doc.scenes.forEach(s=>{for(const id of del)delete s.pos[id]});doc.marks=doc.marks.filter(m=>!del.has(m.id));clearSel()}),'全削除を確定');
 }
 function renderProps(){
  const el=$('#props');if(isMulti()){renderMulti(el);return}
@@ -913,7 +913,7 @@ function renderProps(){
   <p class="note">バミリは全シーン共通です。平面図・3Dでドラッグして動かせます。</p>`;
   $('#mSnap').onclick=()=>{const st=doc.theater.tsura||1;change(()=>{mk.x=+(Math.round(mk.x/st)*st).toFixed(3)})};
   $('#mDup').onclick=()=>change(()=>{const n={...mk,id:uid(),x:mk.x+(doc.theater.tsura||0.5),label:mk.label};doc.marks.push(n);sel=n.id});
-  twice($('#mDel'),()=>change(()=>{doc.marks=doc.marks.filter(m=>m.id!==mk.id);sel=null}),'もう一度押すと削除');
+  twice($('#mDel'),()=>change(()=>{doc.marks=doc.marks.filter(m=>m.id!==mk.id);sel=null}),'削除を確定');
  }else if(!it){const sc=scene(),T=doc.theater;
   el.innerHTML=`<h3>シーン ${doc.cur+1}</h3>${field('名前','sc.title',sc.title,'')}
   <div class="row"><label>メモ</label></div><textarea data-k="sc.note" rows="4" placeholder="台詞のきっかけ、動きなど">${esc(sc.note||'')}</textarea>
@@ -951,7 +951,7 @@ function renderProps(){
   if(on){$('#pCenter').onclick=()=>change(()=>{scene().pos[it.id].x=0});
    $('#pAll').onclick=()=>change(()=>{for(let i=doc.cur+1;i<doc.scenes.length;i++)doc.scenes[i].pos[it.id]={...scene().pos[it.id]}})}
   $('#pDup').onclick=()=>change(()=>{const n={...it,id:uid(),name:it.name+'2'};doc.items.push(n);const q=scene().pos[it.id]||{x:0,y:2,r:0,on:true};scene().pos[n.id]={...q,x:q.x+0.5,on:true};sel=n.id});
-  twice($('#pDel'),()=>change(()=>{doc.items=doc.items.filter(i=>i.id!==it.id);doc.scenes.forEach(s=>delete s.pos[it.id]);sel=null}),'もう一度押すと削除');
+  twice($('#pDel'),()=>change(()=>{doc.items=doc.items.filter(i=>i.id!==it.id);doc.scenes.forEach(s=>delete s.pos[it.id]);sel=null}),'削除を確定');
  }
  el.querySelectorAll('[data-k]').forEach(inp=>{
   const commit=()=>{const k=inp.dataset.k;let v=inp.type==='checkbox'?inp.checked:inp.value;
@@ -999,7 +999,7 @@ function renderThumbs(){
 }
 function renderThumb(i){const c=$(`#thumbs .th[data-i="${i}"] canvas`);if(!c)return;const g=c.getContext('2d'),vw=fitView({},240,124,'plan',4);g.setTransform(1,0,0,1,0,0);renderTo(g,240,124,vw,'plan',{scene:doc.scenes[i],ui:false,sel:null})}
 $('#scAdd').onclick=()=>change(()=>{const s=scene();const n={id:uid(),title:'シーン'+(doc.scenes.length+1),note:'',dur:s.dur||1.2,pos:JSON.parse(JSON.stringify(s.pos))};doc.scenes.splice(doc.cur+1,0,n);doc.cur++});
-twice($('#scDel'),()=>{if(doc.scenes.length<2){log('最後のシーンは消せません');return}change(()=>{doc.scenes.splice(doc.cur,1);doc.cur=clamp(doc.cur,0,doc.scenes.length-1)})},'もう一度で削除');
+twice($('#scDel'),()=>{if(doc.scenes.length<2){log('最後のシーンは消せません');return}change(()=>{doc.scenes.splice(doc.cur,1);doc.cur=clamp(doc.cur,0,doc.scenes.length-1)})},'削除を確定');
 const _scL=()=>{if(doc.cur>0)change(()=>{const s=doc.scenes.splice(doc.cur,1)[0];doc.cur--;doc.scenes.splice(doc.cur,0,s)})};
 const _scR=()=>{if(doc.cur<doc.scenes.length-1)change(()=>{const s=doc.scenes.splice(doc.cur,1)[0];doc.cur++;doc.scenes.splice(doc.cur,0,s)})};
 
@@ -1043,9 +1043,9 @@ function renderUlCtl(){const T=doc.theater,el=$('#ulCtl');if(!T.ul){el.innerHTML
  <div class="row"><label>白黒反転</label><input type="checkbox" id="ulInvC" ${T.ul.invert!==false?'checked':''}><span class="note" style="margin:0">暗い画面で見やすく</span></div>
  <div class="row"><label>濃さ</label><input type="range" min="0.1" max="1" step="0.05" id="ulOp" value="${T.ul.opacity}" style="flex:1"></div>
  <div class="grp"><button id="ulDel" class="warn">図面を外す</button>${T.outline?'<button id="olClr" class="warn">舞台の形を四角に戻す</button>':''}</div>`;
- const oc=$('#olClr');if(oc)twice(oc,()=>{change(()=>doc.theater.outline=null);renderUlCtl();fitMain()},'もう一度で戻す');
+ const oc=$('#olClr');if(oc)twice(oc,()=>{change(()=>doc.theater.outline=null);renderUlCtl();fitMain()},'リセットを確定');
  if(T.ul){$('#ulShow').onchange=e=>{change(()=>T.ul.show=e.target.checked)};$('#ulInvC').onchange=e=>{change(()=>T.ul.invert=e.target.checked)};$('#ulOp').oninput=e=>{T.ul.opacity=+e.target.value;draw()};$('#ulOp').onchange=()=>save();
-  twice($('#ulDel'),()=>{change(()=>doc.theater.ul=null);ulSrc=null;ulImg=null;ulDirty=true;save();renderUlCtl()},'もう一度で外す')}}
+  twice($('#ulDel'),()=>{change(()=>doc.theater.ul=null);ulSrc=null;ulImg=null;ulDirty=true;save();renderUlCtl()},'解除を確定')}}
 
 /* ---------- 図面読み取り ---------- */
 const C={img:null,src:null,mpp:null,pdf:null,mode:null,pts:[],front:null,back:null,outline:[],meas:[],scaleFromPdf:false,v:{k:1,ox:0,oy:0}};
@@ -1241,7 +1241,7 @@ $('#fExport').onclick=()=>{download(fname('.json'),new Blob([JSON.stringify(expo
 $('#fCopy').onclick=async()=>{try{await navigator.clipboard.writeText(JSON.stringify(exportObj()));$('#fCopy').textContent='コピーしました'}catch(e){$('#fCopy').textContent='コピーできませんでした';log('コピー失敗',e.message)}setTimeout(()=>$('#fCopy').textContent='中身をコピー',2000)};
 $('#fImport').onclick=()=>$('#fFile').click();
 $('#fFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const o=JSON.parse(await f.text());const d=o.doc||o;if(!d.scenes||!d.items||!d.theater)throw new Error('形式が違います');pushUndo();doc=fixDoc(d);ulSrc=o.ul||null;ulImg=ulSrc?await loadImg(ulSrc):null;ulInv=null;ulDirty=true;sel=null;afterLoad();fitMain();$('#mMenu').classList.remove('show');log('読み込み',f.name)}catch(err){log('読み込み失敗',err.message);$('#fImport').textContent='読み込めません：'+err.message;setTimeout(()=>$('#fImport').textContent='ファイルから読み込む',3000)}};
-twice($('#fNew'),()=>{change(()=>{doc=newDoc()});ulSrc=null;ulImg=null;ulDirty=true;sel=null;afterLoad();fitMain();$('#mMenu').classList.remove('show')},'もう一度押すと新しく作る');
+twice($('#fNew'),()=>{change(()=>{doc=newDoc()});ulSrc=null;ulImg=null;ulDirty=true;sel=null;afterLoad();fitMain();$('#mMenu').classList.remove('show')},'新規作成を確定');
 $('#fLogCopy').onclick=async()=>{try{await navigator.clipboard.writeText(LOG.join('\n'))}catch(e){}};
 let pngBlob=null;
 $('#fPng').onclick=()=>{pngName=fname('_'+(doc.cur+1)+'.png');$('#mPng h2').textContent='図の画像';const W=1920,H=1080,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
@@ -1571,7 +1571,7 @@ function flowSheet(){const n=doc.scenes.length,W0=1240,head=120,bh=400;let H0=he
 let pngName='図.png';
 $('#sSheet').onclick=()=>{try{const c=flowSheet();$('#pngImg').src=c.toDataURL('image/png');pngName=(doc.theater.name||'舞台')+'_流れ.png';c.toBlob(b=>pngBlob=b);$('#mPng h2').textContent='舞台の流れ（1枚の画像）';$('#mMenu').classList.remove('show');$('#mPng').classList.add('show');log('流れの画像を作った')}catch(e){log('流れの画像失敗',e.message)}};
 // 見るだけモード：自分用にコピー
-twice($('#vCopy'),()=>{viewOnly=false;document.body.classList.remove('view');try{history.replaceState(null,'',location.pathname)}catch(e){}ulSrc=null;ulImg=null;ulInv=null;ulDirty=true;save();renderAll();fitMain();toast('自分のデータとして保存しました。編集できます')},'いまの自分の内容と入れ替わります。もう一度押す');
+twice($('#vCopy'),()=>{viewOnly=false;document.body.classList.remove('view');try{history.replaceState(null,'',location.pathname)}catch(e){}ulSrc=null;ulImg=null;ulInv=null;ulDirty=true;save();renderAll();fitMain();toast('自分のデータとして保存しました。編集できます')},'現在の内容と置換を確定');
 window.addEventListener('hashchange',()=>{if(/^#s=/.test(location.hash))location.reload()});
 
 /* ---------- 自動更新 ---------- */
